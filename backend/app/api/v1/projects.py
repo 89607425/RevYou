@@ -79,8 +79,11 @@ async def create_project(
 ):
     import json
     default_config = {
+        "pm_model": "glm-4",
+        "dev_model": "deepseek-v3",
+        "qa_model": "qwen-vl-max",
         "text_model": "deepseek-v3",
-        "multimodal_model": "qwen-vl-max",
+        "multimodal_model": "glm-4v-plus",
         "auto_switch_model": True,
         "confidence_threshold_low": 0.5,
         "confidence_threshold_high": 0.8,
@@ -90,6 +93,9 @@ async def create_project(
         "max_issues_per_agent": 30,
         "session_timeout_deterministic_min": 5,
         "session_timeout_autonomous_min": 10,
+        "tapd_workspace_id": "37119417",
+        "tapd_bug_workspace_id": "38585571",
+        "enable_debate": False,
     }
 
     project = Project(
@@ -140,6 +146,7 @@ async def get_project(
         "project_id": project.project_id,
         "name": project.name,
         "tapd_project_id": project.tapd_project_id,
+        "tapd_api_user": project.tapd_api_user or "",
         "has_tapd_token": bool(project.tapd_token_encrypted),
         "config": project.config,
         "members": members,
@@ -185,6 +192,7 @@ async def set_tapd_token(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     from app.core.security import hash_password
+    project.tapd_api_user = req.tapd_api_user
     project.tapd_token_encrypted = req.tapd_token
     await db.commit()
 

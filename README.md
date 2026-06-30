@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)](https://docs.docker.com/compose/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1)](https://www.mysql.com/)
 
 ---
 
@@ -55,34 +55,41 @@
           ┌────────────────────┼────────────────────┐
           ▼                    ▼                    ▼
    ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-   │  PostgreSQL  │  │    Redis     │  │  LangGraph       │
-   │  (Port 5432) │  │  (Port 6379) │  │  (Agent 引擎)    │
+   │    MySQL 8   │  │    Redis 7   │  │  LangGraph       │
+   │  (Port 3306) │  │  (Port 6379) │  │  (Agent 引擎)    │
    └──────────────┘  └──────────────┘  └──────────────────┘
 ```
 
-- **后端**：FastAPI + SQLAlchemy (async) + PostgreSQL 15 + Redis 7
+- **后端**：FastAPI + SQLAlchemy (async) + MySQL 8.0 + Redis 7
 - **前端**：Next.js 14 + TypeScript + Tailwind CSS
 - **Agent 引擎**：LangGraph + StateGraph，fan-out/fan-in 并行模式
 - **LLM**：通过硅基流动 (SiliconFlow) API 调用 DeepSeek-V3 等模型
-- **基础设施**：Docker Compose 编排，支持一键启动
+- **基础设施**：支持本地运行和 Docker Compose 两种方式
 
 ---
 
 ## 快速开始
 
-### 前置要求
+### 方式一：本地开发启动（推荐 ✨）
 
-- [Docker](https://docs.docker.com/get-docker/) 和 Docker Compose
-- 硅基流动 [API Key](https://cloud.siliconflow.cn/)（用于 LLM 调用）
+零 Docker 依赖，前后端均在本地运行，支持热重载，修改代码即时生效。
 
-### 1. 克隆项目
+#### 前置要求
+
+- **Node.js >= 20**：[nvm](https://github.com/nvm-sh/nvm) 或[官网安装](https://nodejs.org/)
+- **Python 3.11+**：推荐使用 [pyenv](https://github.com/pyenv/pyenv)
+- **MySQL 8.0**：本地安装并运行
+- **Redis 7**：本地安装并运行
+- 硅基流动 [API Key](https://cloud.siliconflow.cn/)
+
+#### 1. 克隆项目
 
 ```bash
 git clone https://github.com/your-username/RevYou.git
 cd RevYou
 ```
 
-### 2. 配置环境变量
+#### 2. 配置环境变量
 
 编辑 `.env` 文件，填入你的硅基流动 API Key：
 
@@ -93,17 +100,15 @@ LLM_OPENAI_API_KEY=sk-your-key-here
 LLM_BASE_URL=https://api.siliconflow.cn/v1
 ```
 
-> 💡 如果使用其他 LLM 提供商，修改 `LLM_BASE_URL` 和对应的 `LLM_*_BASE_URL` 即可。所有接口兼容 OpenAI API 格式。
-
-### 3. 一键启动
+#### 3. 一键启动
 
 ```bash
-docker compose up -d
+./start-local.sh
 ```
 
-首次启动会拉取镜像并安装依赖，**约需 2-5 分钟**。后续启动只需几秒。
+首次运行会自动安装依赖、创建数据库表、初始化种子数据。之后每次启动只需几秒。
 
-### 4. 访问应用
+#### 4. 访问应用
 
 | 服务 | 地址 |
 |------|------|
@@ -111,7 +116,7 @@ docker compose up -d
 | API 文档 (Swagger) | http://localhost:8000/docs |
 | 健康检查 | http://localhost:8000/api/v1/health |
 
-### 5. 默认账号
+#### 5. 默认账号
 
 | 用户名 | 密码 | 角色 |
 |--------|------|------|
@@ -120,7 +125,27 @@ docker compose up -d
 | dev | dev123 | 开发者 |
 | qa | qa123 | 测试工程师 |
 
-### 6. 使用流程
+#### 6. 停止服务
+
+```bash
+./stop-local.sh          # 停止前后端，MySQL 和 Redis 保持运行
+```
+
+---
+
+### 方式二：Docker Compose 一键启动
+
+所有服务运行在容器中，适合部署或不想手动安装依赖的场景。
+
+```bash
+docker compose up -d
+```
+
+首次启动会构建镜像并安装依赖，约需 2-5 分钟。
+
+---
+
+## 使用流程
 
 1. **创建项目** → 登录后新建评审项目，可配置 Agent 角色和自定义规则
 2. **创建评审会话** → 粘贴 PRD Markdown 文本 / 上传 PDF/DOCX 文件 / 从 TAPD 导入
@@ -159,33 +184,44 @@ RevYou/
 │   │   ├── lib/              # API 客户端
 │   │   └── types/            # TypeScript 类型定义
 │   └── Dockerfile
-├── docker-compose.yml        # Docker 编排（web, api, worker, postgres, redis）
+├── docker-compose.yml        # Docker 编排（web, api, worker, mysql, redis）
+├── start-local.sh            # 本地开发一键启动
+├── stop-local.sh             # 停止本地开发服务
 ├── .env                      # 环境变量
 └── README.md
 ```
 
 ---
 
-## 常见问题
+## 本地开发
 
-### Docker 首次启动为什么慢？
-
-首次 `docker compose up -d` 需要：
-1. 拉取基础镜像（Python、PostgreSQL、Redis）
-2. 下载并编译 Python 依赖（约 60 个包）
-3. 构建前端 Next.js 应用
-
-**后续启动只需几秒**，Docker 会缓存所有构建层。只有修改 `requirements.txt` 或 `Dockerfile` 时才需要重新构建。
-
-### 如何停止服务？
+### 本地启动
 
 ```bash
-docker compose down        # 停止并移除容器
-docker compose down -v     # 同时删除数据卷（数据库数据会丢失）
+./start-local.sh
 ```
+
+- 自动检查 Node.js、Python、MySQL、Redis 是否就绪
+- 首次运行自动安装依赖、创建数据库表、导入种子数据
+- 修改后端代码 → FastAPI 热重载
+- 修改前端代码 → Next.js 热更新
+- MySQL 和 Redis 使用本地服务，Navicat 可直接连接 localhost:3306
+
+### 停止服务
+
+```bash
+./stop-local.sh          # 停止前后端，MySQL 和 Redis 保持运行
+```
+
+---
+
+## 常见问题
 
 ### 如何查看日志？
 
+**本地开发**：日志直接输出在终端。
+
+**Docker**：
 ```bash
 docker compose logs -f api      # API 日志
 docker compose logs -f worker   # Worker 日志
@@ -194,6 +230,14 @@ docker compose logs -f web      # 前端日志
 
 ### 如何重置数据库？
 
+**本地开发**：
+```bash
+/usr/local/mysql/bin/mysql -u root -phjy89607425 -D revyou -e "DROP DATABASE revyou; CREATE DATABASE revyou CHARACTER SET utf8mb4;"
+/usr/local/mysql/bin/mysql -u root -phjy89607425 -D revyou < backend/sql/init.sql
+cd backend && ENV_FILE=.env.local python -m app.scripts.seed
+```
+
+**Docker**：
 ```bash
 docker compose down -v
 docker compose up -d
@@ -205,5 +249,3 @@ docker compose exec api python -m app.scripts.seed
 ## License
 
 MIT
-# RevYou
-# RevYou

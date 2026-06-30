@@ -75,90 +75,41 @@ def build_section_tree(sections: list) -> list:
     return root
 
 
-def parse_pdf(file_path: str) -> dict:
-    """Extract text and images from a PDF file."""
+def parse_pdf(file_path: str) -> str:
+    """Extract text from a PDF file. Accepts file path or bytes."""
     try:
         import fitz
     except ImportError:
-        return {"text": "[PDF解析需要安装PyMuPDF]", "images": [], "page_count": 0}
+        return "[PDF解析需要安装PyMuPDF]"
 
-    doc = fitz.open(file_path)
+    if isinstance(file_path, bytes):
+        doc = fitz.open(stream=file_path, filetype="pdf")
+    else:
+        doc = fitz.open(file_path)
     text_content = ""
-    images = []
-    image_dir = os.path.join(os.path.dirname(file_path), "images")
-    os.makedirs(image_dir, exist_ok=True)
-
     for page_num, page in enumerate(doc):
         text_content += page.get_text()
-        for img_idx, img in enumerate(page.get_images(full=True)):
-            xref = img[0]
-            try:
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-                image_ext = base_image["ext"]
-                image_fname = f"pdf_p{page_num + 1}_i{img_idx + 1}.{image_ext}"
-                image_path = os.path.join(image_dir, image_fname)
-                with open(image_path, "wb") as f:
-                    f.write(image_bytes)
-                images.append({
-                    "image_id": f"IMG-{uuid.uuid4().hex[:8]}",
-                    "filename": image_fname,
-                    "source": "PDF_EMBEDDED",
-                    "content_type": f"image/{image_ext}",
-                    "filesize": len(image_bytes),
-                    "local_path": image_path,
-                    "recognition_status": "PENDING",
-                    "recognition_result": None,
-                    "section_id": None,
-                })
-            except Exception:
-                continue
 
-    page_count = len(doc)
     doc.close()
-    return {"text": text_content, "images": images, "page_count": page_count}
+    return text_content
 
 
-def parse_docx(file_path: str) -> dict:
-    """Extract text and images from a Word document."""
+def parse_docx(file_path: str) -> str:
+    """Extract text from a Word document. Accepts file path or bytes."""
     try:
         from docx import Document
+        from io import BytesIO
     except ImportError:
-        return {"text": "[Word解析需要安装python-docx]", "images": [], "paragraphs": 0}
+        return "[Word解析需要安装python-docx]"
 
-    doc = Document(file_path)
+    if isinstance(file_path, bytes):
+        doc = Document(BytesIO(file_path))
+    else:
+        doc = Document(file_path)
     text_content = ""
-    images = []
-    image_dir = os.path.join(os.path.dirname(file_path), "images")
-    os.makedirs(image_dir, exist_ok=True)
-
     for para in doc.paragraphs:
         text_content += para.text + "\n"
-
-    try:
-        for rel_id, rel in doc.part.rels.items():
-            if "image" in rel.reltype:
-                image_bytes = rel.target_part.blob
-                ext = rel.target_part.partname.split(".")[-1]
-                image_fname = f"docx_{rel_id}.{ext}"
-                image_path = os.path.join(image_dir, image_fname)
-                with open(image_path, "wb") as f:
-                    f.write(image_bytes)
-                images.append({
-                    "image_id": f"IMG-{uuid.uuid4().hex[:8]}",
-                    "filename": image_fname,
-                    "source": "DOCX_EMBEDDED",
-                    "content_type": f"image/{ext}",
-                    "filesize": len(image_bytes),
-                    "local_path": image_path,
-                    "recognition_status": "PENDING",
-                    "recognition_result": None,
-                    "section_id": None,
-                })
-    except Exception:
-        pass
-
-    return {"text": text_content, "images": images, "paragraphs": len(doc.paragraphs)}
+    return text_content
 
 
 def enrich_prd_with_image_text(prd_text: str, prd_images: list) -> str:

@@ -75,7 +75,9 @@ async def list_issues(
         "image_ref": i.image_ref,
         "confidence": float(i.confidence) if i.confidence else None,
         "confidence_label": i.confidence_label,
+        "cross_review_tags": i.cross_review_tags,
         "status": i.status,
+        "review_round": i.review_round,
         "created_at": i.created_at.isoformat() if i.created_at else None,
         "updated_at": i.updated_at.isoformat() if i.updated_at else None,
     } for i in issues]

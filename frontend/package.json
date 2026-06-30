@@ -9,32 +9,33 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ant-design/icons": "^5.2.6",
+    "@ant-design/nextjs-registry": "^1.0.0",
+    "@next/swc-darwin-arm64": "^16.2.9",
+    "antd": "^5.14.0",
+    "axios": "^1.6.7",
+    "dayjs": "^1.11.10",
+    "js-cookie": "^3.0.5",
     "next": "14.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "antd": "^5.14.0",
-    "@ant-design/nextjs-registry": "^1.0.0",
-    "@ant-design/icons": "^5.2.6",
-    "recharts": "^2.10.4",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
-    "rehype-highlight": "^7.0.0",
+    "recharts": "^2.10.4",
     "reconnecting-websocket": "^4.4.0",
-    "dayjs": "^1.11.10",
-    "axios": "^1.6.7",
-    "js-cookie": "^3.0.5",
+    "rehype-highlight": "^7.0.0",
+    "remark-gfm": "^4.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@types/js-cookie": "^3.0.6",
+    "@types/node": "^20.11.5",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "@types/node": "^20.11.5",
-    "@types/js-cookie": "^3.0.6",
-    "tailwindcss": "^3.4.1",
     "autoprefixer": "^10.4.17",
-    "postcss": "^8.4.33",
     "eslint": "^8.56.0",
-    "eslint-config-next": "14.1.0"
+    "eslint-config-next": "14.1.0",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3"
   }
 }

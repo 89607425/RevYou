@@ -8,14 +8,13 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_WS_URL=ws://localhost:8000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/next.config.js:/app/next.config.js
     depends_on:
       - api
     restart: unless-stopped
-    develop:
-      watch:
-        - path: ./frontend/src
-          action: sync
-          target: /app/src
 
   api:
     build:
@@ -26,14 +25,14 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://revyou:hjy89607425@postgres:5432/revyou
+      - DATABASE_URL=mysql+aiomysql://revyou:hjy89607425@mysql:3306/revyou
       - REDIS_URL=redis://redis:6379/0
       - UPLOAD_DIR=/data/uploads
     volumes:
       - upload_data:/data/uploads
       - ./backend/app:/app/app
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -47,35 +46,36 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://revyou:hjy89607425@postgres:5432/revyou
+      - DATABASE_URL=mysql+aiomysql://revyou:hjy89607425@mysql:3306/revyou
       - REDIS_URL=redis://redis:6379/0
       - UPLOAD_DIR=/data/uploads
     volumes:
       - upload_data:/data/uploads
       - ./backend/app:/app/app
     depends_on:
-      postgres:
+      mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
 
-  postgres:
-    image: postgres:15-alpine
+  mysql:
+    image: mysql:8.0
     ports:
-      - "5432:5432"
+      - "3306:3306"
     environment:
-      - POSTGRES_USER=revyou
-      - POSTGRES_PASSWORD=hjy89607425
-      - POSTGRES_DB=revyou
+      - MYSQL_ROOT_PASSWORD=hjy89607425
+      - MYSQL_DATABASE=revyou
+      - MYSQL_USER=revyou
+      - MYSQL_PASSWORD=hjy89607425
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
       - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U revyou"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "revyou", "-phjy89607425"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
     restart: unless-stopped
 
   redis:
@@ -92,6 +92,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  pg_data:
+  mysql_data:
   redis_data:
   upload_data:

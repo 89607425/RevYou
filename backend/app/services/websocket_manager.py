@@ -71,6 +71,20 @@ class WebSocketManager:
             "agent": agent, "progress": progress,
         })
 
+    async def broadcast_awaiting_answer(self, session_id: str, follow_ups: list, current_round: int, max_rounds: int):
+        await self.send_message(session_id, "AWAITING_ANSWER", {
+            "session_id": session_id,
+            "follow_ups": follow_ups,
+            "current_round": current_round,
+            "max_rounds": max_rounds,
+        })
+
+    async def broadcast_review_resumed(self, session_id: str, current_round: int):
+        await self.send_message(session_id, "RESUME_REVIEW", {
+            "session_id": session_id,
+            "current_round": current_round,
+        })
+
     async def handle_follow_up_answer(self, session_id: str, follow_up_id: str, action: str, answer: str = None):
         """Handle a follow-up answer from the client via WebSocket."""
         return {

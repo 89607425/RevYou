@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -12,8 +11,9 @@ class Project(Base):
     project_id = Column(String(32), primary_key=True)
     name = Column(String(128), nullable=False)
     tapd_project_id = Column(String(32))
+    tapd_api_user = Column(String(128))
     tapd_token_encrypted = Column(String)
-    config = Column(JSONB, nullable=False)
+    config = Column(JSON, nullable=False)
     status = Column(String(16), nullable=False, default="ACTIVE")
     created_by = Column(String(32), ForeignKey("users.user_id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

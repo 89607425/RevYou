@@ -68,8 +68,11 @@ async def seed():
         # Create demo project
         import json
         default_config = {
+            "pm_model": "glm-4",
+            "dev_model": "deepseek-v3",
+            "qa_model": "qwen-vl-max",
             "text_model": "deepseek-v3",
-            "multimodal_model": "qwen-vl-max",
+            "multimodal_model": "glm-4v-plus",
             "auto_switch_model": True,
             "confidence_threshold_low": 0.5,
             "confidence_threshold_high": 0.8,
@@ -79,6 +82,9 @@ async def seed():
             "max_issues_per_agent": 30,
             "session_timeout_deterministic_min": 5,
             "session_timeout_autonomous_min": 10,
+            "tapd_workspace_id": "37119417",
+            "tapd_bug_workspace_id": "38585571",
+            "enable_debate": False,
         }
 
         project = Project(
@@ -101,8 +107,52 @@ async def seed():
         for m in members:
             db.add(m)
 
+        # ── 一块医药 project with built-in TAPD token ──
+        yky_config = {
+            "pm_model": "glm-4",
+            "dev_model": "deepseek-v3",
+            "qa_model": "qwen-vl-max",
+            "text_model": "deepseek-v3",
+            "multimodal_model": "glm-4v-plus",
+            "auto_switch_model": True,
+            "confidence_threshold_low": 0.5,
+            "confidence_threshold_high": 0.8,
+            "max_review_rounds_deterministic": 1,
+            "max_review_rounds_autonomous": 3,
+            "max_follow_up_questions": 5,
+            "max_issues_per_agent": 30,
+            "session_timeout_deterministic_min": 5,
+            "session_timeout_autonomous_min": 10,
+            "tapd_workspace_id": "37119417",
+            "tapd_bug_workspace_id": "38585571",
+            "enable_debate": False,
+            "tapd_token": "83e76cf85e8d89074ec256485d67b04b41349256",
+        }
+
+        yky_project = Project(
+            project_id="PRJ-YKY-001",
+            name="一块医药",
+            tapd_project_id="37119417",
+            tapd_token_encrypted="83e76cf85e8d89074ec256485d67b04b41349256",
+            config=yky_config,
+            status="ACTIVE",
+            created_by="USR-ADMIN-001",
+        )
+        db.add(yky_project)
+        await db.flush()
+
+        yky_members = [
+            ProjectMember(project_id="PRJ-YKY-001", user_id="USR-ADMIN-001", role="ADMIN"),
+            ProjectMember(project_id="PRJ-YKY-001", user_id="USR-PM-001", role="PM"),
+            ProjectMember(project_id="PRJ-YKY-001", user_id="USR-DEV-001", role="DEV"),
+            ProjectMember(project_id="PRJ-YKY-001", user_id="USR-QA-001", role="QA"),
+        ]
+        for m in yky_members:
+            db.add(m)
+
         await db.commit()
         print("Seed completed: admin/admin123, pm/pm123, dev/dev123, qa/qa123")
+        print("Created projects: 电商平台（演示项目）, 一块医药 (TAPD token built-in)")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,9 @@
-"""Agent engine: LangGraph-based parallel agent review system."""
+"""Agent engine: compatibility layer delegating to the multi-agent orchestrator.
+
+Maintains backward compatibility for all public functions while
+internally using the new DebateOrchestrator with real agent instances.
+"""
+
 import asyncio
 import json
 import re
@@ -8,11 +13,71 @@ from datetime import datetime, timezone
 from typing import TypedDict, Annotated, Optional
 from operator import add
 
+def _merge_dicts(a: dict, b: dict) -> dict:
+    return {**a, **b}
+
 from langgraph.graph import StateGraph, END
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Model Provider Map (shared utility) ───
+
+MODEL_PROVIDER_MAP = {
+    "deepseek-v3": {
+        "api_key_attr": "LLM_DEEPSEEK_API_KEY",
+        "base_url_attr": "LLM_DEEPSEEK_BASE_URL",
+        "model_id": "deepseek-chat",
+    },
+    "glm-4": {
+        "api_key_attr": "LLM_ZHIPU_API_KEY",
+        "base_url_attr": "LLM_ZHIPU_BASE_URL",
+        "model_id": "glm-4-plus",
+    },
+    "glm-4v-plus": {
+        "api_key_attr": "LLM_ZHIPU_API_KEY",
+        "base_url_attr": "LLM_ZHIPU_BASE_URL",
+        "model_id": "glm-4v-plus",
+    },
+    "glm-4v-flash": {
+        "api_key_attr": "LLM_ZHIPU_API_KEY",
+        "base_url_attr": "LLM_ZHIPU_BASE_URL",
+        "model_id": "glm-4v-flash",
+    },
+    "qwen-vl-max": {
+        "api_key_attr": "LLM_SILICONFLOW_API_KEY",
+        "base_url_attr": "LLM_SILICONFLOW_BASE_URL",
+        "model_id": "deepseek-ai/DeepSeek-V3",
+    },
+    "gemini-2.0-flash": {
+        "api_key_attr": "LLM_GEMINI_API_KEY",
+        "base_url_attr": "LLM_GEMINI_BASE_URL",
+        "model_id": "gemini-2.0-flash",
+    },
+    "gpt-4o": {
+        "api_key_attr": "LLM_SILICONFLOW_API_KEY",
+        "base_url_attr": "LLM_SILICONFLOW_BASE_URL",
+        "model_id": "deepseek-ai/DeepSeek-V3",
+    },
+}
+
+AGENT_MODEL_KEY_MAP = {
+    "PM_REVIEW": "pm_model",
+    "DEV_REVIEW": "dev_model",
+    "QA_REVIEW": "qa_model",
+}
+
+
+def _get_provider_for_model(model: str) -> dict:
+    if model not in MODEL_PROVIDER_MAP:
+        logger.warning(f"Unknown model '{model}', falling back to deepseek-v3")
+        model = "deepseek-v3"
+    entry = MODEL_PROVIDER_MAP[model]
+    api_key = getattr(settings, entry["api_key_attr"], "")
+    base_url = getattr(settings, entry["base_url_attr"], settings.LLM_BASE_URL)
+    return {"api_key": api_key, "base_url": base_url, "model_id": entry["model_id"]}
 
 
 # ─── State Definition ───
@@ -28,7 +93,7 @@ class ReviewState(TypedDict):
 
     issues: Annotated[list, add]
     follow_ups: Annotated[list, add]
-    agent_statuses: dict
+    agent_statuses: Annotated[dict, _merge_dicts]
     current_round: int
 
     pending_follow_ups: list
@@ -38,7 +103,7 @@ class ReviewState(TypedDict):
     session_status: str
 
 
-# ─── Agent Prompts ───
+# ─── Agent Prompts (kept for backward compat / standalone use) ───
 
 PM_SYSTEM_PROMPT = """你是一位资深产品经理，现在负责从产品视角审查PRD文档。你的目标是发现PRD中的逻辑漏洞、信息缺失和不一致之处。
 
@@ -200,63 +265,37 @@ AGENT_PROMPTS = {
 # ─── LLM Call Utilities ───
 
 async def call_llm(system_prompt: str, user_content: str, model: str = "deepseek-v3") -> str:
-    """Call LLM API. In MVP, uses langchain for model-agnostic calls.
-    
-    For now, returns a structured mock response indicating the service is ready
-    but requires API keys configured. Real implementation will use the OpenAI-compatible
-    APIs for DeepSeek, Qwen, and GPT-4o.
-    """
-    # TODO: Replace with real LLM call once API keys are configured
-    # This stub returns an informative message - in production this would call the LLM API.
-    
+    """Call LLM API via the appropriate provider for the given model."""
     try:
         from langchain_openai import ChatOpenAI
-        
-        if model == "deepseek-v3":
-            llm = ChatOpenAI(
-                model="deepseek-chat",
-                api_key=settings.LLM_DEEPSEEK_API_KEY,
-                base_url=settings.LLM_DEEPSEEK_BASE_URL,
-                temperature=0.3,
-                max_tokens=4096,
-            )
-        elif model in ("qwen-vl-max", "gpt-4o"):
-            base = settings.LLM_QWEN_BASE_URL if "qwen" in model else settings.LLM_OPENAI_BASE_URL
-            key = settings.LLM_QWEN_API_KEY if "qwen" in model else settings.LLM_OPENAI_API_KEY
-            llm = ChatOpenAI(
-                model=model,
-                api_key=key,
-                base_url=base,
-                temperature=0.3,
-                max_tokens=4096,
-            )
-        else:
-            llm = ChatOpenAI(
-                model="deepseek-chat",
-                api_key=settings.LLM_DEEPSEEK_API_KEY,
-                base_url=settings.LLM_DEEPSEEK_BASE_URL,
-                temperature=0.3,
-                max_tokens=4096,
-            )
-        
+
+        provider = _get_provider_for_model(model)
+
+        llm = ChatOpenAI(
+            model=provider["model_id"],
+            openai_api_key=provider["api_key"],
+            base_url=provider["base_url"],
+            temperature=0.3,
+            max_tokens=8192,
+        )
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_content},
         ]
         response = await llm.ainvoke(messages)
         return response.content if hasattr(response, "content") else str(response)
-    
+
     except Exception as e:
         logger.warning(f"LLM call failed ({model}): {e}")
-        # Return mock data for development when API keys not configured
         return json.dumps({
             "issues": [{
-                "title": f"[开发模式] LLM调用需要配置API Key ({model})",
+                "title": f"LLM调用失败 ({model})",
                 "issue_type": "LOGIC_GAP",
-                "severity": "LOW",
-                "description": f"LLM API Key 未配置或调用失败: {str(e)}。请检查 .env 文件中的 LLM 相关配置。",
-                "suggestion": "配置有效的 LLM API Key 后重试",
-                "prd_section": "系统配置",
+                "severity": "HIGH",
+                "description": f"调用失败: {str(e)[:500]}",
+                "suggestion": "检查 API Key 配置和网络连接后重试",
+                "prd_section": "",
                 "prd_quote": "",
                 "confidence": 0.3,
                 "image_ref": None,
@@ -264,7 +303,7 @@ async def call_llm(system_prompt: str, user_content: str, model: str = "deepseek
         }, ensure_ascii=False)
 
 
-async def call_multimodal_model(image_path: str, prompt: str, model: str = "qwen-vl-max") -> Optional[str]:
+async def call_multimodal_model(image_path: str, prompt: str, model: str = "glm-4v-plus") -> Optional[str]:
     """Call multimodal model for image recognition."""
     try:
         from langchain_openai import ChatOpenAI
@@ -273,10 +312,12 @@ async def call_multimodal_model(image_path: str, prompt: str, model: str = "qwen
         with open(image_path, "rb") as f:
             image_data = base64.b64encode(f.read()).decode()
 
+        provider = _get_provider_for_model(model)
+
         llm = ChatOpenAI(
-            model=model,
-            api_key=settings.LLM_QWEN_API_KEY,
-            base_url=settings.LLM_QWEN_BASE_URL,
+            model=provider["model_id"],
+            openai_api_key=provider["api_key"],
+            base_url=provider["base_url"],
             temperature=0.1,
             max_tokens=2048,
         )
@@ -295,38 +336,74 @@ async def call_multimodal_model(image_path: str, prompt: str, model: str = "qwen
         return f"[图片识别失败: {str(e)}]"
 
 
-# ─── JSON Parsing (Three-layer defense) ───
+# ─── JSON Parsing (Four-layer defense) ───
 
 def parse_agent_response(raw: str, agent_name: str) -> list[dict]:
-    """Parse Agent response using three-layer defense strategy."""
-    # Layer 1: Direct JSON parse
+    """Parse Agent response using four-layer defense strategy."""
+    if not raw or not raw.strip():
+        return [{"title": f"[{agent_name}] 空响应", "issue_type": "UNSTRUCTURED", "severity": "LOW",
+                 "description": "Agent 返回了空内容", "suggestion": "", "confidence": 0.1,
+                 "prd_section": None, "prd_quote": None, "image_ref": None}]
+
     try:
         parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return validate_and_normalize_issues(parsed, agent_name)
         issues = parsed.get("issues", [])
         if isinstance(issues, list):
             return validate_and_normalize_issues(issues, agent_name)
     except (json.JSONDecodeError, TypeError):
         pass
 
-    # Layer 2: Extract from markdown code block or find first JSON
     extracted = extract_json_from_response(raw)
     if extracted:
         try:
             parsed = json.loads(extracted)
+            if isinstance(parsed, list):
+                return validate_and_normalize_issues(parsed, agent_name)
             issues = parsed.get("issues", [])
             if isinstance(issues, list):
                 return validate_and_normalize_issues(issues, agent_name)
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # Layer 3: Fallback - return as unstructured issue
-    logger.warning(f"Agent {agent_name}: JSON parse failed, using fallback")
+    candidates = []
+    fence_match = re.search(r'```(?:json)?\s*\n([\s\S]+)', raw)
+    if fence_match:
+        candidates.append(fence_match.group(1).strip())
+    if extracted:
+        candidates.append(extracted)
+    json_start = re.search(r'[\{\[]', raw)
+    if json_start:
+        candidates.append(raw[json_start.start():])
+    if not candidates:
+        candidates.append(raw)
+
+    fixed = None
+    for candidate in candidates:
+        fixed = fix_truncated_json(candidate)
+        if fixed:
+            break
+
+    if fixed:
+        try:
+            parsed = json.loads(fixed)
+            if isinstance(parsed, list):
+                return validate_and_normalize_issues(parsed, agent_name)
+            issues = parsed.get("issues", [])
+            if isinstance(issues, list) and issues:
+                logger.info(f"Agent {agent_name}: recovered {len(issues)} issues from truncated JSON")
+                return validate_and_normalize_issues(issues, agent_name)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    logger.warning(f"Agent {agent_name}: all JSON parse layers failed, raw length={len(raw)}")
     return [{
-        "title": f"[{agent_name}] 非结构化审查输出",
+        "title": f"[{agent_name}] AI输出格式异常",
         "issue_type": "UNSTRUCTURED",
         "severity": "LOW",
         "description": raw[:2000],
-        "suggestion": "AI输出格式异常，请人工审核",
+        "suggestion": f"响应长度 {len(raw)} 字符，未能解析为JSON，请人工审核",
         "prd_section": None,
         "prd_quote": None,
         "confidence": 0.3,
@@ -334,29 +411,106 @@ def parse_agent_response(raw: str, agent_name: str) -> list[dict]:
     }]
 
 
+def fix_truncated_json(text: str) -> Optional[str]:
+    if not text:
+        return None
+    text = text.strip()
+    if not (text.startswith("{") or text.startswith("[")):
+        return None
+
+    result = _try_fix_json(text)
+    if result:
+        return result
+
+    stripped = text
+    for _ in range(3):
+        stripped = _strip_trailing_incomplete(stripped)
+        if stripped == text:
+            break
+        result = _try_fix_json(stripped)
+        if result:
+            return result
+
+    return None
+
+
+def _try_fix_json(text: str) -> Optional[str]:
+    stack = []
+    in_string = False
+    escape = False
+    for ch in text:
+        if escape:
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            escape = True
+            continue
+        if ch == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch in ("{", "["):
+            stack.append(ch)
+        elif ch == "}":
+            if stack and stack[-1] == "{":
+                stack.pop()
+        elif ch == "]":
+            if stack and stack[-1] == "[":
+                stack.pop()
+
+    suffix = ""
+    if in_string:
+        suffix += '"'
+        if stack and stack[-1] == "{":
+            suffix += ':"?"'
+            stack.pop()
+    closers = {"{": "}", "[": "]"}
+    suffix += "".join(closers[c] for c in reversed(stack))
+    if not suffix:
+        return None
+
+    fixed = text.rstrip().rstrip(",") + suffix
+    try:
+        __import__('json').loads(fixed)
+        return fixed
+    except (ValueError, __import__('json').JSONDecodeError):
+        return None
+
+
+def _strip_trailing_incomplete(text: str) -> str:
+    last_comma = text.rfind(",")
+    last_close_brace = text.rfind("}")
+    last_close_bracket = text.rfind("]")
+    safe_pos = max(last_comma, last_close_brace, last_close_bracket)
+    if safe_pos >= 0:
+        return text[:safe_pos + 1].rstrip()
+    for i, ch in enumerate(text):
+        if ch in ("{", "["):
+            return text[:i + 1]
+    return text
+
+
 def extract_json_from_response(text: str) -> Optional[str]:
-    """Extract JSON from LLM response (markdown code block or raw)."""
-    # Try markdown code block
-    pattern = r'```(?:json)?\s*\n([\s\S]*?)\n```'
+    pattern = r'```(?:json)?\s*\n([\s\S]*?)\n\s*```'
     matches = re.findall(pattern, text)
     if matches:
         return max(matches, key=len).strip()
 
-    # Try to find first complete JSON object or array
-    bracket_match = re.search(r'\[[\s\S]*\]', text)
-    brace_match = re.search(r'\{[\s\S]*\}', text)
+    clean = re.sub(r'^```(?:json)?\s*\n', '', text.strip())
+    bracket_match = re.search(r'\[[\s\S]*\]', clean)
+    brace_match = re.search(r'\{[\s\S]*\}', clean)
     candidates = []
     if bracket_match:
         candidates.append(bracket_match.group(0))
     if brace_match:
         candidates.append(brace_match.group(0))
     if candidates:
-        return min(candidates, key=lambda c: text.index(c))
+        return min(candidates, key=lambda c: clean.index(c))
     return None
 
 
 def validate_and_normalize_issues(issues: list, agent_name: str) -> list[dict]:
-    """Validate and normalize issue fields."""
     valid_types = {"TECHNICAL_RISK", "LOGIC_GAP", "TEST_MISSING", "DATA_INCONSISTENCY", "UNSTRUCTURED"}
     valid_severities = {"HIGH", "MEDIUM", "LOW"}
 
@@ -379,7 +533,6 @@ def validate_and_normalize_issues(issues: list, agent_name: str) -> list[dict]:
 
 
 def extract_follow_ups_from_response(raw: str) -> list[dict]:
-    """Extract follow-up questions from autonomous mode response."""
     try:
         parsed = json.loads(raw)
         return parsed.get("follow_ups", [])
@@ -396,189 +549,80 @@ def extract_follow_ups_from_response(raw: str) -> list[dict]:
     return []
 
 
-# ─── Agent Nodes ───
+# ─── Legacy Graph Builders (kept for backward compat, delegate to orchestrator) ───
 
-async def parse_prd_node(state: ReviewState) -> dict:
-    """Parse PRD: recognize images, prepare content for agents."""
-    prd_images = state.get("prd_images", [])
-    
-    for img in prd_images:
-        if img.get("recognition_status") == "PENDING" and img.get("local_path"):
-            try:
-                result = await call_multimodal_model(
-                    img["local_path"],
-                    "请描述这张图片的内容，重点关注：流程步骤、状态转换、数据流向、关键节点。以结构化文本输出。"
-                )
-                if result:
-                    img["recognition_status"] = "COMPLETED"
-                    img["recognition_result"] = result
-            except Exception:
-                img["recognition_status"] = "FAILED"
-
-    from app.services.prd_parser import enrich_prd_with_image_text
-    enriched = enrich_prd_with_image_text(state["prd_content"], prd_images)
-
-    return {
-        "prd_content": enriched,
-        "prd_images": prd_images,
-        "agent_statuses": {"PM_REVIEW": "PENDING", "DEV_REVIEW": "PENDING", "QA_REVIEW": "PENDING"},
-        "issues": [],
-        "follow_ups": [],
-        "current_round": 1,
-        "pending_follow_ups": [],
-        "user_answers": [],
-    }
+def build_deterministic_graph():
+    """Legacy: returns a compiled LangGraph. Use run_review() instead."""
+    from app.agents.orchestrator import DebateOrchestrator
+    orch = DebateOrchestrator({})
+    return orch.build_fast_graph()
 
 
-async def pm_review_node(state: ReviewState) -> dict:
-    return await _run_single_agent(state, "PM_REVIEW")
-
-
-async def dev_review_node(state: ReviewState) -> dict:
-    return await _run_single_agent(state, "DEV_REVIEW")
-
-
-async def qa_review_node(state: ReviewState) -> dict:
-    return await _run_single_agent(state, "QA_REVIEW")
-
-
-async def _run_single_agent(state: ReviewState, agent_name: str) -> dict:
-    """Execute a single agent review call."""
-    config = state.get("project_config", {})
-    model = config.get("text_model", "deepseek-v3")
-    has_images = any(img.get("recognition_status") == "COMPLETED" for img in state.get("prd_images", []))
-    if has_images and config.get("auto_switch_model", True):
-        model = config.get("multimodal_model", "qwen-vl-max")
-
-    system_prompt = AGENT_PROMPTS[agent_name]
-    if state["agent_mode"] == "AUTONOMOUS":
-        system_prompt += AUTONOMOUS_APPEND
-
-    user_content = f"请审查以下PRD文档：\n\n{state['prd_content'][:30000]}"
-    if state.get("user_answers"):
-        user_content += "\n\n## 用户补充信息\n"
-        for ans in state["user_answers"]:
-            user_content += f"- {ans.get('answer', '')}\n"
-
-    try:
-        response = await asyncio.wait_for(
-            call_llm(system_prompt, user_content, model),
-            timeout=120.0,
-        )
-    except asyncio.TimeoutError:
-        return {
-            "issues": [{"title": f"[{agent_name}] 审查超时", "issue_type": "LOGIC_GAP", "severity": "LOW",
-                        "description": "Agent审查超时", "suggestion": "请重试", "confidence": 0.3}],
-        }
-
-    issues = parse_agent_response(response, agent_name)
-    follow_ups = []
-    if state["agent_mode"] == "AUTONOMOUS":
-        follow_ups = extract_follow_ups_from_response(response)[:5]
-
-    agent_statuses = dict(state.get("agent_statuses", {}))
-    agent_statuses[agent_name] = "COMPLETED"
-
-    return {"issues": issues, "follow_ups": follow_ups, "agent_statuses": agent_statuses}
-
-
-def merge_issues_node(state: ReviewState) -> dict:
-    """Merge and deduplicate issues from all agents."""
-    all_issues = state.get("issues", [])
-    
-    # Calculate confidence labels
-    for issue in all_issues:
-        conf = issue.get("confidence", 0.5)
-        if conf >= 0.8:
-            issue["confidence_label"] = "HIGH"
-        elif conf >= 0.5:
-            issue["confidence_label"] = "MEDIUM"
-        else:
-            issue["confidence_label"] = "LOW"
-
-    return {"final_issues": all_issues, "session_status": "COMPLETED"}
-
-
-# ─── Graph Builders ───
-
-def build_deterministic_graph() -> StateGraph:
-    """Build the deterministic (single-round) review graph."""
-    graph = StateGraph(ReviewState)
-
-    graph.add_node("parse_prd", parse_prd_node)
-    graph.add_node("pm_review", pm_review_node)
-    graph.add_node("dev_review", dev_review_node)
-    graph.add_node("qa_review", qa_review_node)
-    graph.add_node("merge_issues", merge_issues_node)
-
-    graph.set_entry_point("parse_prd")
-
-    # Parallel edges: parse -> three agents
-    graph.add_edge("parse_prd", "pm_review")
-    graph.add_edge("parse_prd", "dev_review")
-    graph.add_edge("parse_prd", "qa_review")
-
-    # Converge: agents -> merge
-    graph.add_edge("pm_review", "merge_issues")
-    graph.add_edge("dev_review", "merge_issues")
-    graph.add_edge("qa_review", "merge_issues")
-
-    graph.add_edge("merge_issues", END)
-
-    return graph.compile()
-
-
-def build_autonomous_graph() -> StateGraph:
-    """Build the autonomous (multi-round with follow-ups) review graph.
-    
-    For MVP, uses a similar structure to deterministic but allows
-    follow-up extraction and re-review cycles.
-    Currently placeholder for Phase 7 full implementation.
-    """
-    # MVP: use deterministic graph for now, autonomous mode details
-    # will be fully implemented in Phase 7
+def build_autonomous_graph():
+    """Legacy: returns the fast graph. Autonomous mode handled via orchestrator."""
     return build_deterministic_graph()
 
 
+# ─── Main Entry Point ───
+
 async def run_review(
-    session_id: str,
-    project_id: str,
     prd_content: str,
-    prd_structure: dict,
-    prd_images: list,
-    agent_mode: str,
-    project_config: dict,
+    agent_mode: str = "DETERMINISTIC",
+    config: dict = None,
+    session_id: str = "",
+    project_id: str = "",
+    prd_structure: dict = None,
+    prd_images: list = None,
+    ws_manager=None,
+    user_answers: list = None,
 ) -> dict:
-    """Run the review process and return results."""
-    initial_state = ReviewState(
-        session_id=session_id,
-        project_id=project_id,
-        prd_content=prd_content,
-        prd_structure=prd_structure or {},
-        prd_images=prd_images or [],
-        agent_mode=agent_mode,
-        project_config=project_config,
-        issues=[],
-        follow_ups=[],
-        agent_statuses={},
-        current_round=0,
-        pending_follow_ups=[],
-        user_answers=[],
-        final_issues=[],
-        session_status="RUNNING",
+    """Run the multi-agent review process.
+
+    Now delegates to DebateOrchestrator which supports:
+    - FAST mode: parallel PM/Dev/QA review (5 min timeout)
+    - DEBATE mode: serial review with cross-review tagging (enabled via config.enable_debate=True)
+    - Optional function-calling tool use for each agent
+    - Cross-review tagging in debate mode
+    """
+    from app.agents.orchestrator import DebateOrchestrator
+
+    orch = DebateOrchestrator(
+        project_config=config or {},
+        ws_manager=ws_manager,
     )
 
-    if agent_mode == "AUTONOMOUS":
-        graph = build_autonomous_graph()
-    else:
-        graph = build_deterministic_graph()
-
     try:
-        result = await asyncio.wait_for(
-            graph.ainvoke(initial_state),
-            timeout=600.0,
+        if ws_manager and session_id:
+            await ws_manager.send_message(session_id, "AGENT_THINKING", {
+                "agent": "SYSTEM",
+                "message": "正在启动多 Agent 审查...",
+                "phase": "STARTING",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+
+        result = await orch.run(
+            prd_content=prd_content,
+            agent_mode=agent_mode,
+            session_id=session_id,
+            project_id=project_id,
+            prd_structure=prd_structure or {},
+            prd_images=prd_images or [],
+            user_answers=user_answers or [],
         )
         return result
     except asyncio.TimeoutError:
-        initial_state["session_status"] = "TIMEOUT"
-        return initial_state
+        return {
+            "session_id": session_id,
+            "project_id": project_id,
+            "prd_content": prd_content,
+            "prd_structure": prd_structure or {},
+            "prd_images": prd_images or [],
+            "agent_mode": agent_mode,
+            "project_config": config or {},
+            "issues": [],
+            "follow_ups": [],
+            "agent_statuses": {},
+            "current_round": 0,
+            "final_issues": [],
+            "session_status": "TIMEOUT",
+        }

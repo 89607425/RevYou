@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Numeric
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Numeric, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -13,14 +12,14 @@ class ReviewSession(Base):
     project_id = Column(String(32), ForeignKey("projects.project_id"), nullable=False)
     prd_content = Column(Text, nullable=False)
     prd_source = Column(String(16), nullable=False)
-    prd_structure = Column(JSONB)
-    prd_images = Column(JSONB)
+    prd_structure = Column(JSON)
+    prd_images = Column(JSON)
     tapd_story_id = Column(String(32))
     agent_mode = Column(String(16), nullable=False, default="DETERMINISTIC")
     status = Column(String(16), nullable=False, default="RUNNING")
     initiator_id = Column(String(32), ForeignKey("users.user_id"), nullable=False)
-    agent_results = Column(JSONB)
-    follow_up_questions = Column(JSONB)
+    agent_results = Column(JSON)
+    follow_up_questions = Column(JSON)
     started_at = Column(DateTime(timezone=True))
     completed_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -47,6 +46,7 @@ class ReviewIssue(Base):
     confidence_label = Column(String(8), nullable=False, default="HIGH")
     status = Column(String(20), nullable=False, default="OPEN")
     review_round = Column(Integer, nullable=False, default=1)
+    cross_review_tags = Column(JSON)
     resolved_by = Column(String(32), ForeignKey("users.user_id"))
     resolution_note = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

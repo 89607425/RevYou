@@ -1,14 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)",
-      "Bash(npm install)",
-      "Bash(python3 -c \"import sys; sys.path.insert(0, ''.''); from app.core.config import settings; print(''Config OK:'', settings.PROJECT_NAME)\")",
-      "Bash(export https_proxy=http://127.0.0.1:33210 http_proxy=http://127.0.0.1:33210 all_proxy=socks5://127.0.0.1:33211)",
-      "Bash(docker compose:*)",
-      "Bash(pkill:*)",
-      "Bash(pkill -f \"docker build\")",
-      "Bash(curl:*)"
+      "Bash(/usr/local/mysql/bin/mysql -u root -phjy89607425 -D revyou -e \"\nSELECT project_id, name, JSON_EXTRACT(config, ''$.tapd_workspace_id'') as tapd_ws, JSON_EXTRACT(config, ''$.tapd_bug_workspace_id'') as bug_ws, tapd_token_encrypted\nFROM projects WHERE project_id = ''PRJ-YKY-001'';\n\")",
+      "Bash(/usr/local/mysql/bin/mysql -u root -phjy89607425 -D revyou -e \"ALTER TABLE review_issues ADD COLUMN cross_review_tags JSON; SELECT column_name FROM information_schema.columns WHERE table_name=''''review_issues'''';\")"
     ],
     "deny": [],
     "ask": []

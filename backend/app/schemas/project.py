@@ -4,8 +4,11 @@ from datetime import datetime
 
 
 class ProjectConfig(BaseModel):
+    pm_model: str = "glm-4"
+    dev_model: str = "deepseek-v3"
+    qa_model: str = "qwen-vl-max"
     text_model: str = "deepseek-v3"
-    multimodal_model: str = "qwen-vl-max"
+    multimodal_model: str = "glm-4v-plus"
     auto_switch_model: bool = True
     confidence_threshold_low: float = 0.5
     confidence_threshold_high: float = 0.8
@@ -15,6 +18,9 @@ class ProjectConfig(BaseModel):
     max_issues_per_agent: int = 30
     session_timeout_deterministic_min: int = 5
     session_timeout_autonomous_min: int = 10
+    tapd_workspace_id: str = "37119417"
+    tapd_bug_workspace_id: str = "38585571"
+    enable_debate: bool = False
 
 
 class ProjectCreate(BaseModel):
@@ -23,6 +29,9 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdateConfig(BaseModel):
+    pm_model: Optional[str] = None
+    dev_model: Optional[str] = None
+    qa_model: Optional[str] = None
     text_model: Optional[str] = None
     multimodal_model: Optional[str] = None
     auto_switch_model: Optional[bool] = None
@@ -31,9 +40,13 @@ class ProjectUpdateConfig(BaseModel):
     max_review_rounds_deterministic: Optional[int] = None
     max_review_rounds_autonomous: Optional[int] = None
     max_follow_up_questions: Optional[int] = None
+    tapd_workspace_id: Optional[str] = None
+    tapd_bug_workspace_id: Optional[str] = None
+    enable_debate: Optional[bool] = None
 
 
 class TapdTokenRequest(BaseModel):
+    tapd_api_user: str
     tapd_token: str
 
 

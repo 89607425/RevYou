@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AntdRegistry } from "@ant-design/nextjs-registry";
-import { ConfigProvider } from "antd";
+import { ConfigProvider, App } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import "./globals.css";
 
@@ -15,7 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AntdRegistry>
           <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: "#1677ff" } }}>
-            {children}
+            <App>
+              {children}
+            </App>
           </ConfigProvider>
         </AntdRegistry>
       </body>
