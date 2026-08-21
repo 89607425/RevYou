@@ -1,251 +1,352 @@
-# RevYou - AI 需求评审 Agent
+<div align="right">
 
-> 让 AI 代替 PM、Dev、QA 三个角色并行审查你的 PRD 文档，在开发前发现逻辑漏洞、技术风险和测试遗漏。
+🌐 **Language:** &nbsp; **[English](README.md)** &nbsp;|&nbsp; [简体中文](README.zh-CN.md)
 
-[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-009688)](https://fastapi.tiangolo.com/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1)](https://www.mysql.com/)
+</div>
 
----
+<div align="center">
 
-## 功能概述
+<img src="docs/images/logo-banner.png" alt="RevYou — Autonomous Requirement Review" width="860"/>
 
-### 核心能力
+<br/>
 
-- **三 Agent 并行审查**：PM（产品视角）、Dev（技术视角）、QA（测试视角）三个 AI Agent 同时审查 PRD，各司其职
-- **两阶段审查模式**：
-  - **确定性工作流**：一次性完成审查，适合标准 PRD
-  - **自主 Agent 模式**：支持追问和澄清，适合复杂 PRD
-- **多格式 PRD 导入**：支持 Markdown 文本、PDF、DOCX 文件上传，以及 TAPD 项目导入
-- **图片识别**：自动识别 PRD 中的流程图/架构图，注入文本上下文
+<p align="center">
+  <a href="https://github.com/89607425/RevYou"><img src="https://img.shields.io/badge/version-1.0.0-6366f1?style=for-the-badge" alt="Version"/></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"/>
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18"/>
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/DeepSeek-8B5CF6?style=for-the-badge" alt="DeepSeek"/>
+  <a href="https://github.com/89607425/RevYou/stargazers"><img src="https://img.shields.io/github/stars/89607425/RevYou?style=for-the-badge&color=6366f1" alt="Stars"/></a>
+  <a href="https://github.com/89607425/RevYou/issues"><img src="https://img.shields.io/github/issues/89607425/RevYou?style=for-the-badge" alt="Issues"/></a>
+  <img src="https://img.shields.io/badge/PRs-welcome-22c55e?style=for-the-badge" alt="PRs Welcome"/>
+</p>
 
-### 评审维度
-
-| Agent | 审查维度 |
-|-------|---------|
-| PM | 用户流程完整性、状态流转、埋点缺失、文案一致性、边界条件、异常流 |
-| Dev | 技术风险、接口依赖、数据一致性、幂等设计、并发问题、兼容性 |
-| QA | 边界条件测试、异常流程测试、Case 遗漏、状态覆盖 |
-
-### 问题管理
-
-- 问题严重等级：HIGH / MEDIUM / LOW，带置信度
-- WebSocket 实时推送审查进度和发现的问题
-- 问题状态流转：OPEN → ACKNOWLEDGED → IN_PROGRESS → RESOLVED → CLOSED
-- 支持对每个问题进行评论讨论
-
-### 导出与统计
-
-- 审查报告导出：Markdown / PDF
-- 问题列表导出：CSV / Excel
-- 项目风险仪表盘：问题分布、严重等级统计、趋势分析
+</div>
 
 ---
 
-## 技术架构
+**RevYou** is an **autonomous multi-agent system** that puts three senior reviewers — *Product*, *Developer*, and *Tester* — in front of every requirement document. Each agent runs its own **Plan → Execute → Reflect → Adjust → Consolidate** loop, so the review path is *crafted per document* rather than hard-coded. A second cross-perspective pass closes the blind spots that any single reviewer would have missed.
 
+> ✨ Different requirements produce different review paths. No two reviews look the same.
+
+<br/>
+
+## 📑 Table of contents
+
+- [✨ Highlights](#-highlights)
+- [🎬 Demo flow](#-demo-flow)
+- [🧠 How it works](#-how-it-works)
+- [🏗️ Architecture](#-architecture)
+- [🔁 The autonomous agent loop](#-the-autonomous-agent-loop)
+- [🧪 Two-phase review](#-two-phase-review)
+- [🚀 Quick start](#-quick-start)
+- [📂 Project layout](#-project-layout)
+- [🌐 API reference](#-api-reference)
+- [🧬 Tech stack](#-tech-stack)
+- [📏 Design principles](#-design-principles)
+- [🗺️ Roadmap](#-roadmap)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+
+---
+
+## ✨ Highlights
+
+- 🧠 **Truly autonomous, not scripted.** Each agent analyzes the document and authors its own `ReviewPlan` — the *what* and *how* of its review — before it lifts a finger.
+- 🪞 **Self-correcting loop.** Every pass ends with a reflection step. If the agent decides a focus area is thin, it re-reviews (up to 2 reflection rounds, 12 LLM calls total).
+- 🧩 **Three perspectives in parallel.** PM, Dev, and Test review independently first; a cross-perspective pass then asks each agent to chase the blind spots of the other two.
+- 🧰 **Three input channels.** Paste Markdown, upload a `.md` / `.pdf` file, or pull a story straight from TAPD via OpenAPI.
+- 📜 **Structured reports.** Issues are scored on a four-level severity scale, with cross-agent agreements/disagreements surfaced, and a final readiness verdict.
+- 📡 **Full thinking trace, live.** Every intermediate artifact (plan, execute, reflect, consolidate) is persisted in SQLite and pushed to the browser via Server-Sent Events.
+- 🛡️ **Hard cost & safety rails.** Agents are pure reasoning — they cannot call tools, browse, or hit the network. All I/O is funnelled through the Orchestrator.
+
+---
+
+## 🎬 Demo flow
+
+```text
+  ┌────────────┐    ┌─────────────────────┐    ┌────────────────────────┐    ┌──────────────┐
+  │ User input │ →  │ Orchestrator parses │ →  │ 3 agents run in parallel│ →  │ Cross-review │
+  │ MD / PDF / │    │ & chunks the doc    │    │  (each: Plan→Exec→     │    │ Phase 2      │
+  │ TAPD ID    │    │  (token-budgeted)   │    │   Reflect→Adjust→     │    │ (peer-blind) │
+  └────────────┘    └─────────────────────┘    │   Consolidate)        │    └──────┬───────┘
+                                                 └────────────────────────┘           │
+                                                                                     ▼
+                                                                          ┌──────────────────┐
+                                                                          │ Aggregated       │
+                                                                          │ structured report│
+                                                                          │ + thinking trace │
+                                                                          └──────────────────┘
 ```
-┌─────────────┐     ┌──────────────────────────────┐
-│  Next.js 14 │────▶│  FastAPI (Python 3.11)        │
-│  (Port 3000)│     │  /api/v1/*                   │
-└─────────────┘     │  /ws/sessions/{id}           │
-                    └──────────┬───────────────────┘
-                               │
-          ┌────────────────────┼────────────────────┐
-          ▼                    ▼                    ▼
-   ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐
-   │    MySQL 8   │  │    Redis 7   │  │  LangGraph       │
-   │  (Port 3306) │  │  (Port 6379) │  │  (Agent 引擎)    │
-   └──────────────┘  └──────────────┘  └──────────────────┘
-```
-
-- **后端**：FastAPI + SQLAlchemy (async) + MySQL 8.0 + Redis 7
-- **前端**：Next.js 14 + TypeScript + Tailwind CSS
-- **Agent 引擎**：LangGraph + StateGraph，fan-out/fan-in 并行模式
-- **LLM**：通过硅基流动 (SiliconFlow) API 调用 DeepSeek-V3 等模型
-- **基础设施**：支持本地运行和 Docker Compose 两种方式
 
 ---
 
-## 快速开始
+## 🧠 How it works
 
-### 方式一：本地开发启动（推荐 ✨）
+The system is built around a deliberate separation of concerns:
 
-零 Docker 依赖，前后端均在本地运行，支持热重载，修改代码即时生效。
+| Layer        | What it does                                                                                  | What it must **not** do                                       |
+|--------------|------------------------------------------------------------------------------------------------|---------------------------------------------------------------|
+| **Frontend** | Renders UI, takes input, subscribes to SSE for live trace, shows the final report.            | Talk to the LLM. Talk to TAPD. Persist anything.             |
+| **Orchestrator** | Parses docs, calls TAPD OpenAPI, calls the LLM, persists jobs, aggregates reports, streams events. | Generate review content. Make subjective judgments.         |
+| **Agents**   | Read text in, emit structured JSON out. Decide what to review, how, and when to stop.         | Touch files, networks, or tools.                             |
 
-#### 前置要求
+That last rule is the most important: **an agent is a pure LLM reasoner**. It cannot browse, cannot call TAPD, cannot read a file, cannot write anywhere. The Orchestrator wraps every LLM call and every side-effect, which makes the agents trivially testable, swappable, and cheap to reason about.
 
-- **Node.js >= 20**：[nvm](https://github.com/nvm-sh/nvm) 或[官网安装](https://nodejs.org/)
-- **Python 3.11+**：推荐使用 [pyenv](https://github.com/pyenv/pyenv)
-- **MySQL 8.0**：本地安装并运行
-- **Redis 7**：本地安装并运行
-- 硅基流动 [API Key](https://cloud.siliconflow.cn/)
+---
 
-#### 1. 克隆项目
+## 🏗️ Architecture
+
+<img src="docs/images/architecture.svg" alt="RevYou three-layer architecture" width="920"/>
+
+- The **Frontend** (React 18 + Vite + Ant Design 5) is a thin client. It talks to the Orchestrator over HTTP and SSE only.
+- The **Orchestrator** is a FastAPI process that owns *every* external interaction: document parsing, TAPD OpenAPI calls, LLM calls, SQLite persistence, SSE event fan-out, and final report aggregation.
+- The **Agents** are three identical 5-step loops, one per persona (PM, Dev, Test). They share no state, run concurrently, and exchange nothing except their final reports.
+
+---
+
+## 🔁 The autonomous agent loop
+
+<img src="docs/images/agent-loop.svg" alt="RevYou five-step agent loop" width="920"/>
+
+Each agent is a five-step closed loop, run **once per phase**:
+
+1. **Plan** — the agent reads the requirement and authors a `ReviewPlan`: which focus areas to dig into, in what order, and why.
+2. **Execute** — the agent reviews each focus area in parallel, emitting structured issues with severity, evidence, and rationale.
+3. **Reflect** — the agent inspects its own output, asks "what did I miss?", and writes a `ReflectionReport`.
+4. **Adjust** — *conditional*. If the reflection flags genuine gaps, the agent re-reviews those focus areas (capped at 2 reflection rounds to bound cost).
+5. **Consolidate** — the agent dedupes, scores, and produces its final per-agent report (max 15 issues to keep token usage bounded).
+
+A single review typically produces **30–60 LLM calls** in total (three agents × two phases, each with up to ~10 calls). The whole thing finishes in about 1–2 minutes on DeepSeek.
+
+---
+
+## 🧪 Two-phase review
+
+| Phase                          | What happens                                                                                  |
+|--------------------------------|------------------------------------------------------------------------------------------------|
+| **Phase 1 — independent**      | PM, Dev, and Test each read the document cold and run their full five-step loop.               |
+| **Phase 2 — cross-perspective**| Each agent receives the *other two* agents' blind spots and runs a focused re-review on them. |
+| **Aggregation**                | The Orchestrator dedupes issues (fuzzy match on title + evidence), computes cross-agent agreement, scores top risks, and emits the final readiness verdict. |
+
+Cross-agent agreement is a strong signal: if PM and Test both flag the same gap, the team should pay attention.
+
+---
+
+## 🚀 Quick start
+
+### Prerequisites
+
+- **Python ≥ 3.10** (Anaconda or venv both fine — the project ships an example for `conda activate revyou`)
+- **Node.js ≥ 18** (for the Vite frontend)
+- A **DeepSeek API key** (or any OpenAI-compatible endpoint; configure via env vars)
+- *(Optional)* A **TAPD API token** if you want the in-app TAPD integration
+
+### 1. Clone & configure
 
 ```bash
-git clone https://github.com/your-username/RevYou.git
+git clone https://github.com/89607425/RevYou.git
 cd RevYou
+
+# Backend
+cd backend
+cp .env.example .env
+# Edit .env and fill in:
+#   LLM_API_KEY=sk-...
+#   TAPD_TOKEN=...            (only if you need TAPD)
+#   TAPD_WORKSPACE_IDS=...    (comma-separated)
 ```
 
-#### 2. 配置环境变量
-
-编辑 `.env` 文件，填入你的硅基流动 API Key：
+### 2. Run the backend
 
 ```bash
-LLM_DEEPSEEK_API_KEY=sk-your-key-here
-LLM_QWEN_API_KEY=sk-your-key-here
-LLM_OPENAI_API_KEY=sk-your-key-here
-LLM_BASE_URL=https://api.siliconflow.cn/v1
+conda activate revyou        # or your venv of choice
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-#### 3. 一键启动
+The interactive API docs are now at <http://127.0.0.1:8000/docs>.
+
+### 3. Run the frontend
 
 ```bash
-./start-local.sh
+cd ../frontend
+npm install
+npm run dev
 ```
 
-首次运行会自动安装依赖、创建数据库表、初始化种子数据。之后每次启动只需几秒。
+Open <http://localhost:5173>, paste or upload a requirement, and watch the agents work.
 
-#### 4. 访问应用
-
-| 服务 | 地址 |
-|------|------|
-| 前端界面 | http://localhost:3000 |
-| API 文档 (Swagger) | http://localhost:8000/docs |
-| 健康检查 | http://localhost:8000/api/v1/health |
-
-#### 5. 默认账号
-
-| 用户名 | 密码 | 角色 |
-|--------|------|------|
-| admin | admin123 | 管理员 |
-| pm | pm123 | 产品经理 |
-| dev | dev123 | 开发者 |
-| qa | qa123 | 测试工程师 |
-
-#### 6. 停止服务
+### 4. Run the tests
 
 ```bash
-./stop-local.sh          # 停止前后端，MySQL 和 Redis 保持运行
+cd backend
+python -m pytest tests/ -v
 ```
+
+The suite covers the document parser, the LLM JSON-recovery logic, the agent runner, and the report aggregator.
 
 ---
 
-### 方式二：Docker Compose 一键启动
+## 📂 Project layout
 
-所有服务运行在容器中，适合部署或不想手动安装依赖的场景。
-
-```bash
-docker compose up -d
-```
-
-首次启动会构建镜像并安装依赖，约需 2-5 分钟。
-
----
-
-## 使用流程
-
-1. **创建项目** → 登录后新建评审项目，可配置 Agent 角色和自定义规则
-2. **创建评审会话** → 粘贴 PRD Markdown 文本 / 上传 PDF/DOCX 文件 / 从 TAPD 导入
-3. **等待审查完成** → AI Agent 并行审查，WebSocket 实时推送发现的问题
-4. **查看结果** → 在评审工作台查看三栏布局（PRD 结构 / 原文 / 问题列表）
-5. **处理问题** → 对问题分配状态、添加评论、导出报告
-
----
-
-## 项目结构
-
-```
+```text
 RevYou/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/          # API 路由（auth, projects, sessions, issues, dashboard, export, notifications, tapd, ws）
-│   │   ├── core/             # 核心配置（config, database, security）
-│   │   ├── models/           # 数据模型（user, project, review, notification, audit）
-│   │   ├── schemas/          # Pydantic 请求/响应模型
-│   │   ├── services/         # 业务逻辑（agent_engine, prd_parser, tapd_service, websocket_manager）
-│   │   ├── scripts/          # 工具脚本（seed.py）
-│   │   ├── main.py           # FastAPI 入口
-│   │   └── worker.py         # 后台 Worker 进程
-│   ├── sql/init.sql          # 数据库初始化 DDL（9 张表）
-│   ├── alembic/              # 数据库迁移
-│   ├── requirements.txt      # Python 依赖
-│   └── Dockerfile
+│   │   ├── main.py                    # FastAPI entry point
+│   │   ├── config.py                  # Pydantic settings (loads .env)
+│   │   ├── models/                    # Pydantic data models
+│   │   ├── routers/                   # /api/review, /api/jobs, /api/tapd
+│   │   ├── services/
+│   │   │   ├── agent_runner.py        # ★ The five-step autonomous loop
+│   │   │   ├── orchestrator.py        # Main state machine
+│   │   │   ├── doc_parser.py          # Markdown / PDF parsing
+│   │   │   ├── llm_client.py          # DeepSeek client + JSON salvage
+│   │   │   ├── prompt_manager.py      # Prompt template loader
+│   │   │   ├── context_builder.py     # Token-budgeted context assembly
+│   │   │   ├── report_aggregator.py   # Cross-agent deduplication & scoring
+│   │   │   ├── tapd_adapter.py        # TAPD OpenAPI client
+│   │   │   └── event_bus.py           # In-process SSE event bus
+│   │   └── storage/                   # SQLite job/report persistence
+│   ├── prompts/
+│   │   ├── phase1/                    # plan / execute / reflect / consolidate
+│   │   ├── phase2/                    # cross-perspective pass
+│   │   └── roles/                     # PM / Dev / Test domain prompts
+│   └── tests/                         # Pytest suite
 ├── frontend/
 │   ├── src/
-│   │   ├── app/              # Next.js 页面路由
-│   │   │   ├── login/        # 登录页
-│   │   │   ├── projects/     # 项目列表 & 会话管理
-│   │   │   └── sessions/[id] # 评审工作台
-│   │   ├── components/       # 共享组件
-│   │   ├── hooks/            # 自定义 Hooks
-│   │   ├── lib/              # API 客户端
-│   │   └── types/            # TypeScript 类型定义
-│   └── Dockerfile
-├── docker-compose.yml        # Docker 编排（web, api, worker, mysql, redis）
-├── start-local.sh            # 本地开发一键启动
-├── stop-local.sh             # 停止本地开发服务
-├── .env                      # 环境变量
-└── README.md
+│   │   ├── pages/                     # Upload page, Report page
+│   │   ├── components/                # Trace viewer, issue cards
+│   │   ├── api/                       # Fetch + SSE client
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.ts
+├── docs/
+│   └── images/                        # README diagrams & logo
+├── .env.example                       # Template — never commit your real .env
+├── .gitignore
+├── README.md                          # ← you are here
+└── README.zh-CN.md                    # 简体中文版
 ```
 
 ---
 
-## 本地开发
+## 🌐 API reference
 
-### 本地启动
+| Endpoint                              | Method | Description                                          |
+|---------------------------------------|--------|------------------------------------------------------|
+| `/api/review/markdown`                | POST   | Submit raw Markdown for review                       |
+| `/api/review/file`                    | POST   | Upload a `.md` or `.pdf` file                        |
+| `/api/review/tapd`                    | POST   | Pull a story from TAPD and review it                 |
+| `/api/jobs/{job_id}`                  | GET    | Fetch job status + final report                      |
+| `/api/jobs/{job_id}/events`           | GET    | Subscribe to live SSE trace                          |
+| `/api/jobs/{job_id}/trace`            | GET    | Replay the full thinking trace                       |
+| `/api/tapd/stories/search`            | GET    | Search TAPD stories by keyword                       |
+| `/api/tapd/stories/fetch`             | POST   | Preview a TAPD story before review                   |
+
+Full interactive docs at `http://127.0.0.1:8000/docs` once the backend is running.
+
+---
+
+## 🧬 Tech stack
+
+**Backend**
+
+- 🐍 Python 3.10+ with Pydantic v2
+- ⚡ FastAPI + Uvicorn
+- 🤖 DeepSeek (OpenAI-compatible chat completion, JSON mode, `max_tokens=8192`)
+- 🗄️ SQLite (no external DB to spin up)
+- 📄 `python-markdown` for MD parsing, `PyMuPDF` for PDF
+- 🌐 `httpx` for TAPD OpenAPI
+- 🧪 `pytest` for the test suite
+
+**Frontend**
+
+- ⚛️ React 18 + TypeScript 5
+- ⚡ Vite 5
+- 🎨 Ant Design 5
+- 🧭 React Router 6
+- 📡 Native `EventSource` for SSE
+
+> No LangChain, no LlamaIndex, no heavyweight agent framework. The five-step loop is hand-rolled in roughly 350 lines of Python in `agent_runner.py` — small enough to read in one sitting.
+
+---
+
+## 📏 Design principles
+
+1. **Agents are pure reasoners.** No tool calls, no file I/O, no network. Every side-effect is wrapped by the Orchestrator.
+2. **Autonomy is scoped.** Agents decide *what* to review, *how* to review it, and *when to stop*. They do not decide tooling or overall flow.
+3. **Small core, big leverage.** The Orchestrator stays under ~1000 lines, the agent loop under ~400. The hard problems are in the prompts, not the code.
+4. **Local-first, single-user.** No auth, no multi-tenant, no cloud lock-in. Bring your own API key.
+5. **Token-aware.** `max_tokens=8192`, `top_p` temperature 0.2, JSON mode, plus a JSON-recovery pass that salvages truncated outputs instead of throwing them away.
+6. **Boring infrastructure on purpose.** SQLite, FastAPI, Vite. The interesting work is the agent loop, not the plumbing.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Three-agent five-step loop with reflection & re-review
+- [x] Cross-perspective Phase 2
+- [x] TAPD OpenAPI integration
+- [x] Live SSE trace streaming
+- [x] Structured aggregated report
+- [x] Bilingual README (EN / 简体中文)
+- [ ] Diff review — review a *diff* of two requirement versions, not just the latest one
+- [ ] Historical quality score — track how review quality evolves over time
+- [ ] Pluggable LLM providers (OpenAI / Anthropic / local Ollama) with per-provider prompt tuning
+- [ ] Export the full report as a printable PDF
+- [ ] Multi-tenant mode (optional, behind a flag)
+- [ ] Inline comment anchors — link each issue to a specific span of the source doc
+
+---
+
+## 🤝 Contributing
+
+Issues, PRs, and ideas are very welcome. A few guidelines to keep the bar high:
+
+1. **Keep the agent loop small.** If a feature needs more than ~50 lines inside `agent_runner.py`, it probably belongs in the Orchestrator.
+2. **Add a test.** Anything in `services/` that can be unit-tested should be.
+3. **Don't smuggle I/O into the agents.** The "agents are pure" rule is non-negotiable — it's what makes the system testable and cheap.
+4. **Prompt changes are first-class.** Touch a prompt? Update the relevant role doc and re-run the smoke review.
 
 ```bash
-./start-local.sh
-```
-
-- 自动检查 Node.js、Python、MySQL、Redis 是否就绪
-- 首次运行自动安装依赖、创建数据库表、导入种子数据
-- 修改后端代码 → FastAPI 热重载
-- 修改前端代码 → Next.js 热更新
-- MySQL 和 Redis 使用本地服务，Navicat 可直接连接 localhost:3306
-
-### 停止服务
-
-```bash
-./stop-local.sh          # 停止前后端，MySQL 和 Redis 保持运行
+# Local dev loop
+git checkout -b feature/your-thing
+# ...make your change...
+cd backend && python -m pytest tests/ -v
+git commit -m "feat: describe what changed and why"
 ```
 
 ---
 
-## 常见问题
+## 📄 License
 
-### 如何查看日志？
+This project is released under the **MIT License** — see [`LICENSE`](LICENSE) for details.
 
-**本地开发**：日志直接输出在终端。
-
-**Docker**：
-```bash
-docker compose logs -f api      # API 日志
-docker compose logs -f worker   # Worker 日志
-docker compose logs -f web      # 前端日志
-```
-
-### 如何重置数据库？
-
-**本地开发**：
-```bash
-/usr/local/mysql/bin/mysql -u root -phjy89607425 -D revyou -e "DROP DATABASE revyou; CREATE DATABASE revyou CHARACTER SET utf8mb4;"
-/usr/local/mysql/bin/mysql -u root -phjy89607425 -D revyou < backend/sql/init.sql
-cd backend && ENV_FILE=.env.local python -m app.scripts.seed
-```
-
-**Docker**：
-```bash
-docker compose down -v
-docker compose up -d
-docker compose exec api python -m app.scripts.seed
-```
+> 💡 If you find RevYou useful, a star ⭐ on GitHub is the easiest way to say thanks and helps others discover it.
 
 ---
 
-## License
+## 🙏 Acknowledgments
 
-MIT
+- **DeepSeek** for the high-quality, low-cost OpenAI-compatible inference that makes a 50-call review affordable.
+- **TAPD** for a clean OpenAPI surface that just works.
+- The **Ant Design** team for the design language that keeps the UI consistent.
+- Every open-source project that this stack stands on — FastAPI, React, Vite, PyMuPDF, Pydantic, and the long tail of libraries that turn weekend hacks into real tools.
+
+---
+
+<div align="center">
+
+<sub>Built with ❤️ and a stubborn belief that requirements deserve a real review, not a checklist.</sub>
+
+<br/>
+
+🌐 **[English](README.md)** &nbsp;|&nbsp; [简体中文](README.zh-CN.md)
+
+</div>

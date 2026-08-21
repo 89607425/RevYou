@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="grad2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2.5"/>
+      <feOffset dx="0" dy="2" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="460" fill="#ffffff"/>
+  <text x="480" y="36" text-anchor="middle" font-size="20" font-weight="700" fill="#1e1b4b">Autonomous Five-Step Loop (per agent, per phase)</text>
+  <text x="480" y="58" text-anchor="middle" font-size="12" fill="#64748b">The agent decides <tspan font-weight="700" fill="#4338ca">what to review</tspan>, <tspan font-weight="700" fill="#4338ca">how to review it</tspan>, and <tspan font-weight="700" fill="#4338ca">when to stop</tspan>.</text>
+
+  <!-- Step nodes: Plan, Execute, Reflect, Adjust, Consolidate -->
+  <!-- Step 1: Plan -->
+  <g filter="url(#ds)">
+    <rect x="40" y="120" width="160" height="120" rx="16" fill="url(#grad)"/>
+    <text x="120" y="156" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff">1</text>
+    <text x="120" y="186" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">Plan</text>
+    <text x="120" y="208" text-anchor="middle" font-size="11" fill="#e0e7ff">Read the doc,</text>
+    <text x="120" y="222" text-anchor="middle" font-size="11" fill="#e0e7ff">author a ReviewPlan</text>
+  </g>
+
+  <!-- Step 2: Execute -->
+  <g filter="url(#ds)">
+    <rect x="230" y="120" width="160" height="120" rx="16" fill="url(#grad)"/>
+    <text x="310" y="156" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff">2</text>
+    <text x="310" y="186" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">Execute</text>
+    <text x="310" y="208" text-anchor="middle" font-size="11" fill="#e0e7ff">Review focus areas</text>
+    <text x="310" y="222" text-anchor="middle" font-size="11" fill="#e0e7ff">in parallel</text>
+  </g>
+
+  <!-- Step 3: Reflect -->
+  <g filter="url(#ds)">
+    <rect x="420" y="120" width="160" height="120" rx="16" fill="url(#grad)"/>
+    <text x="500" y="156" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff">3</text>
+    <text x="500" y="186" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">Reflect</text>
+    <text x="500" y="208" text-anchor="middle" font-size="11" fill="#e0e7ff">Self-check coverage</text>
+    <text x="500" y="222" text-anchor="middle" font-size="11" fill="#e0e7ff">&amp; gaps</text>
+  </g>
+
+  <!-- Step 4: Adjust -->
+  <g filter="url(#ds)">
+    <rect x="610" y="120" width="160" height="120" rx="16" fill="url(#grad2)"/>
+    <text x="690" y="156" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff">4</text>
+    <text x="690" y="186" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">Adjust</text>
+    <text x="690" y="208" text-anchor="middle" font-size="11" fill="#e0e7ff">Re-review blind spots</text>
+    <text x="690" y="222" text-anchor="middle" font-size="11" fill="#e0e7ff">if needed (≤ 2×)</text>
+  </g>
+
+  <!-- Step 5: Consolidate -->
+  <g filter="url(#ds)">
+    <rect x="800" y="120" width="140" height="120" rx="16" fill="#312e81"/>
+    <text x="870" y="156" text-anchor="middle" font-size="34" font-weight="700" fill="#ffffff">5</text>
+    <text x="870" y="186" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">Consolidate</text>
+    <text x="870" y="208" text-anchor="middle" font-size="11" fill="#c7d2fe">Dedupe, score,</text>
+    <text x="870" y="222" text-anchor="middle" font-size="11" fill="#c7d2fe">finalize report</text>
+  </g>
+
+  <!-- Arrows between steps -->
+  <line x1="200" y1="180" x2="225" y2="180" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arr)"/>
+  <line x1="390" y1="180" x2="415" y2="180" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arr)"/>
+  <line x1="580" y1="180" x2="605" y2="180" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arr)"/>
+  <line x1="770" y1="180" x2="795" y2="180" stroke="#6366f1" stroke-width="2.5" marker-end="url(#arr)"/>
+
+  <!-- Adjust -> Reflect loopback arrow -->
+  <path d="M 690 245 Q 690 290 580 290 Q 500 290 500 245" fill="none" stroke="#a78bfa" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arr)"/>
+  <text x="590" y="312" text-anchor="middle" font-size="11" fill="#7c3aed" font-weight="600">reflect again if gaps remain</text>
+
+  <!-- Cross-agent peer review banner -->
+  <g>
+    <rect x="40" y="340" width="900" height="86" rx="12" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="60" y="368" font-size="14" font-weight="700" fill="#312e81">Phase 2 — Cross-perspective peer review</text>
+    <text x="60" y="392" font-size="12" fill="#475569">After Phase 1, each agent analyses the OTHER two perspectives' blind spots, then runs a focused re-review.</text>
+    <text x="60" y="412" font-size="12" fill="#475569">The Orchestrator aggregates the final report, removing duplicates and surfacing cross-agent agreements / disagreements.</text>
+  </g>
+</svg>

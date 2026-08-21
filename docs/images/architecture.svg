@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="orch" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#eef2ff"/>
+      <stop offset="100%" stop-color="#ede9fe"/>
+    </linearGradient>
+    <linearGradient id="agent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="980" height="620" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="490" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#1e1b4b">RevYou — Three-Layer Architecture</text>
+  <text x="490" y="64" text-anchor="middle" font-size="13" fill="#64748b">Frontend → Orchestrator (I/O boundary) → Pure-reasoning Agents</text>
+
+  <!-- Frontend layer -->
+  <g filter="url(#shadow)">
+    <rect x="280" y="92" width="420" height="78" rx="14" fill="#ffffff" stroke="#c7d2fe" stroke-width="1.5"/>
+    <text x="490" y="120" text-anchor="middle" font-size="15" font-weight="700" fill="#312e81">Presentation Layer</text>
+    <text x="490" y="142" text-anchor="middle" font-size="12" fill="#475569">React 18 · Vite · TypeScript · Ant Design 5</text>
+    <text x="490" y="160" text-anchor="middle" font-size="11" fill="#64748b">Markdown / PDF / TAPD input · Live SSE trace · Report view</text>
+  </g>
+
+  <!-- Arrow F->O -->
+  <line x1="490" y1="172" x2="490" y2="210" stroke="#6366f1" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="510" y="195" font-size="11" fill="#6366f1" font-weight="600">HTTP / SSE</text>
+
+  <!-- Orchestrator layer -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="216" width="860" height="118" rx="14" fill="url(#orch)" stroke="#a5b4fc" stroke-width="1.5"/>
+    <text x="490" y="240" text-anchor="middle" font-size="15" font-weight="700" fill="#312e81">Orchestrator (FastAPI) — the only I/O boundary</text>
+    <text x="490" y="258" text-anchor="middle" font-size="11" fill="#475569">All external side effects flow through here. Agents never touch the outside world.</text>
+
+    <!-- Tooling row -->
+    <g>
+      <rect x="86" y="278" width="160" height="44" rx="8" fill="#ffffff" stroke="#c7d2fe"/>
+      <text x="166" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#4338ca">DocParser</text>
+      <text x="166" y="314" text-anchor="middle" font-size="10" fill="#64748b">Markdown / PDF</text>
+
+      <rect x="258" y="278" width="160" height="44" rx="8" fill="#ffffff" stroke="#c7d2fe"/>
+      <text x="338" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#4338ca">TAPD Adapter</text>
+      <text x="338" y="314" text-anchor="middle" font-size="10" fill="#64748b">OpenAPI (httpx)</text>
+
+      <rect x="430" y="278" width="160" height="44" rx="8" fill="#ffffff" stroke="#c7d2fe"/>
+      <text x="510" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#4338ca">LLM Client</text>
+      <text x="510" y="314" text-anchor="middle" font-size="10" fill="#64748b">DeepSeek (JSON mode)</text>
+
+      <rect x="602" y="278" width="160" height="44" rx="8" fill="#ffffff" stroke="#c7d2fe"/>
+      <text x="682" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#4338ca">ReportAggregator</text>
+      <text x="682" y="314" text-anchor="middle" font-size="10" fill="#64748b">dedupe · stats</text>
+
+      <rect x="774" y="278" width="132" height="44" rx="8" fill="#ffffff" stroke="#c7d2fe"/>
+      <text x="840" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#4338ca">SQLite</text>
+      <text x="840" y="314" text-anchor="middle" font-size="10" fill="#64748b">jobs · reports</text>
+    </g>
+  </g>
+
+  <!-- Arrow O->A -->
+  <line x1="490" y1="336" x2="490" y2="380" stroke="#6366f1" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="510" y="362" font-size="11" fill="#6366f1" font-weight="600">text in / JSON out</text>
+
+  <!-- Three agents -->
+  <g filter="url(#shadow)">
+    <rect x="90" y="386" width="240" height="120" rx="14" fill="url(#agent)"/>
+    <text x="210" y="416" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">PM Agent</text>
+    <text x="210" y="438" text-anchor="middle" font-size="12" fill="#e0e7ff">Product perspective</text>
+    <text x="210" y="458" text-anchor="middle" font-size="10" fill="#c7d2fe">value · completeness · edge cases · metrics</text>
+    <text x="210" y="476" text-anchor="middle" font-size="10" fill="#c7d2fe">acceptance · ambiguity · scope</text>
+    <text x="210" y="496" text-anchor="middle" font-size="10" font-weight="600" fill="#a5b4fc">· no tools · no I/O ·</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="370" y="386" width="240" height="120" rx="14" fill="url(#agent)"/>
+    <text x="490" y="416" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Dev Agent</text>
+    <text x="490" y="438" text-anchor="middle" font-size="12" fill="#e0e7ff">Developer perspective</text>
+    <text x="490" y="458" text-anchor="middle" font-size="10" fill="#c7d2fe">feasibility · architecture · API · data model</text>
+    <text x="490" y="476" text-anchor="middle" font-size="10" fill="#c7d2fe">performance · security · error handling</text>
+    <text x="490" y="496" text-anchor="middle" font-size="10" font-weight="600" fill="#a5b4fc">· no tools · no I/O ·</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="650" y="386" width="240" height="120" rx="14" fill="url(#agent)"/>
+    <text x="770" y="416" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">Test Agent</text>
+    <text x="770" y="438" text-anchor="middle" font-size="12" fill="#e0e7ff">QA perspective</text>
+    <text x="770" y="458" text-anchor="middle" font-size="10" fill="#c7d2fe">testability · coverage · scenarios</text>
+    <text x="770" y="476" text-anchor="middle" font-size="10" fill="#c7d2fe">compatibility · boundary · regression</text>
+    <text x="770" y="496" text-anchor="middle" font-size="10" font-weight="600" fill="#a5b4fc">· no tools · no I/O ·</text>
+  </g>
+
+  <!-- Cost-control footnote -->
+  <g>
+    <rect x="60" y="536" width="860" height="64" rx="10" fill="#ffffff" stroke="#e0e7ff"/>
+    <text x="86" y="562" font-size="13" font-weight="700" fill="#312e81">Cost &amp; safety rails</text>
+    <text x="86" y="582" font-size="11" fill="#475569">≤ 12 LLM calls / agent per review · ≤ 2 reflection loops · concurrency cap 6 · JSON-mode output ·</text>
+    <text x="86" y="597" font-size="11" fill="#475569">all intermediate thoughts persisted in SQLite and streamed to the UI via SSE.</text>
+  </g>
+</svg>

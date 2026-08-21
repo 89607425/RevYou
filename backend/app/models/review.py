@@ -1,68 +1,165 @@
-from sqlalchemy import Column, String, Text, Integer, DateTime, ForeignKey, Numeric, JSON
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-
-from app.core.database import Base
-
-
-class ReviewSession(Base):
-    __tablename__ = "review_sessions"
-
-    session_id = Column(String(32), primary_key=True)
-    project_id = Column(String(32), ForeignKey("projects.project_id"), nullable=False)
-    prd_content = Column(Text, nullable=False)
-    prd_source = Column(String(16), nullable=False)
-    prd_structure = Column(JSON)
-    prd_images = Column(JSON)
-    tapd_story_id = Column(String(32))
-    agent_mode = Column(String(16), nullable=False, default="DETERMINISTIC")
-    status = Column(String(16), nullable=False, default="RUNNING")
-    initiator_id = Column(String(32), ForeignKey("users.user_id"), nullable=False)
-    agent_results = Column(JSON)
-    follow_up_questions = Column(JSON)
-    started_at = Column(DateTime(timezone=True))
-    completed_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    issues = relationship("ReviewIssue", back_populates="session", cascade="all, delete-orphan")
+"""Review data models — ReviewPlan, ReflectResult, Issue, Agent reports, etc."""
+from enum import Enum
+from pydantic import BaseModel, Field
+from typing import Optional
 
 
-class ReviewIssue(Base):
-    __tablename__ = "review_issues"
-
-    issue_id = Column(String(32), primary_key=True)
-    session_id = Column(String(32), ForeignKey("review_sessions.session_id", ondelete="CASCADE"), nullable=False)
-    source_agent = Column(String(16), nullable=False)
-    issue_type = Column(String(32), nullable=False)
-    severity = Column(String(8), nullable=False)
-    title = Column(String(200), nullable=False)
-    description = Column(Text, nullable=False)
-    suggestion = Column(Text)
-    prd_section = Column(String(200))
-    prd_quote = Column(Text)
-    image_ref = Column(String(200))
-    confidence = Column(Numeric(3, 2), nullable=False, default=0.80)
-    confidence_label = Column(String(8), nullable=False, default="HIGH")
-    status = Column(String(20), nullable=False, default="OPEN")
-    review_round = Column(Integer, nullable=False, default=1)
-    cross_review_tags = Column(JSON)
-    resolved_by = Column(String(32), ForeignKey("users.user_id"))
-    resolution_note = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-
-    session = relationship("ReviewSession", back_populates="issues")
-    comments = relationship("IssueComment", back_populates="issue", cascade="all, delete-orphan")
+class Severity(str, Enum):
+    critical = "critical"
+    major = "major"
+    minor = "minor"
+    suggestion = "suggestion"
 
 
-class IssueComment(Base):
-    __tablename__ = "issue_comments"
+class Issue(BaseModel):
+    id: str = ""
+    severity: Severity = Severity.minor
+    location: str = ""
+    title: str = ""
+    description: str = ""
+    suggestion: str = ""
 
-    comment_id = Column(String(32), primary_key=True)
-    issue_id = Column(String(32), ForeignKey("review_issues.issue_id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(String(32), ForeignKey("users.user_id"), nullable=False)
-    content = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    issue = relationship("ReviewIssue", back_populates="comments")
+# ─── Step 1: ReviewPlan (autonomous planning) ───────────────────────────
+
+class DocumentAnalysis(BaseModel):
+    doc_type: str = Field(description="UI / data / API / business logic / etc.")
+    complexity_score: int = Field(ge=1, le=5)
+    key_observation: str = ""
+
+
+class RiskArea(BaseModel):
+    area: str
+    reason: str
+    evidence_location: str = ""
+
+
+class FocusArea(BaseModel):
+    area: str
+    questions: list[str] = Field(default_factory=list)
+    related_sections: list[str] = Field(default_factory=list)
+
+
+class ReviewPlan(BaseModel):
+    document_analysis: DocumentAnalysis
+    risk_areas: list[RiskArea] = Field(default_factory=list)
+    focus_areas: list[FocusArea] = Field(default_factory=list)
+    depth_assessment: int = Field(ge=1, le=3, default=1)
+
+
+# ─── Step 3: ReflectResult (self-assessment) ─────────────────────────────
+
+class ReflectResult(BaseModel):
+    coverage_gaps: list[str] = Field(default_factory=list)
+    quality_issues: list[str] = Field(default_factory=list,
+        description="IDs of findings that are too vague or lack evidence")
+    false_positives: list[str] = Field(default_factory=list,
+        description="IDs of findings suspected of over-flagging")
+    needs_another_pass: bool = False
+    gap_areas: list[str] = Field(default_factory=list,
+        description="Areas that need re-review if needs_another_pass is True")
+
+
+# ─── Step 2 output: raw findings ────────────────────────────────────────
+
+class FocusAreaFindings(BaseModel):
+    area: str
+    issues: list[Issue] = Field(default_factory=list)
+    notes: str = ""
+
+
+# ─── Phase 1 final output ───────────────────────────────────────────────
+
+class AgentPhase1Report(BaseModel):
+    role: str
+    overall_score: int = 0
+    verdict: str = ""
+    highlights: list[str] = Field(default_factory=list)
+    issues: list[Issue] = Field(default_factory=list)
+    # thinking trace
+    review_plan: Optional[ReviewPlan] = None
+    reflect_result: Optional[ReflectResult] = None
+    call_count: int = 0
+
+
+# ─── Phase 2 (cross-review) models ──────────────────────────────────────
+
+class CrossReviewPlan(BaseModel):
+    peer_insight_analysis: list[str] = Field(default_factory=list,
+        description="What blind spots did peer findings reveal?")
+    re_review_targets: list[str] = Field(default_factory=list,
+        description="Document areas to re-review based on peer findings")
+    my_weakness_check: list[str] = Field(default_factory=list,
+        description="Own conclusions that might be challenged")
+
+
+class PeerOpinion(BaseModel):
+    peer_issue_id: str
+    comment: str = ""
+
+
+class SeverityAdjust(BaseModel):
+    issue_id: str
+    from_severity: Severity
+    to_severity: Severity
+    reason: str
+
+
+class AgentPhase2Report(BaseModel):
+    role: str
+    peer_agreements: list[PeerOpinion] = Field(default_factory=list)
+    peer_disagreements: list[PeerOpinion] = Field(default_factory=list)
+    new_issues: list[Issue] = Field(default_factory=list)
+    severity_adjustments: list[SeverityAdjust] = Field(default_factory=list)
+    # thinking trace
+    cross_review_plan: Optional[CrossReviewPlan] = None
+    call_count: int = 0
+
+
+# ─── Aggregated report ──────────────────────────────────────────────────
+
+class Summary(BaseModel):
+    overall_score: int = 0
+    severity_counts: dict[str, int] = Field(default_factory=dict)
+    role_counts: dict[str, int] = Field(default_factory=dict)
+    top_risks: list[Issue] = Field(default_factory=list)
+    improvement_suggestions: list[str] = Field(default_factory=list)
+    readiness_verdict: str = ""
+
+
+class CrossReviewSummary(BaseModel):
+    agreements: int = 0
+    disagreements: int = 0
+    typical_disagreements: list[str] = Field(default_factory=list)
+
+
+class ReviewReport(BaseModel):
+    job_id: str
+    document_title: str
+    source_type: str
+    summary: Summary = Field(default_factory=Summary)
+    agents: dict[str, AgentPhase1Report] = Field(default_factory=dict)
+    cross_review: dict[str, AgentPhase2Report] = Field(default_factory=dict)
+    cross_summary: CrossReviewSummary = Field(default_factory=CrossReviewSummary)
+
+
+# ─── Job state ──────────────────────────────────────────────────────────
+
+class JobStatus(str, Enum):
+    queued = "queued"
+    parsing = "parsing"
+    phase1 = "phase1"
+    phase2 = "phase2"
+    aggregating = "aggregating"
+    done = "done"
+    failed = "failed"
+
+
+class ThinkingStep(BaseModel):
+    """One step in the agent's thinking trajectory, for SSE + persistence."""
+    agent_role: str
+    phase: str = Field(description="phase1 or phase2")
+    step: str = Field(description="plan / execute / reflect / adjust / consolidate")
+    focus_area: str = ""
+    raw_output: str = ""
+    timestamp: str = ""
