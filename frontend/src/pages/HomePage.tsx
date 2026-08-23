@@ -3,11 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import {
   Card, Tabs, Input, Button, Upload, Form, message, Typography, Space, Alert,
 } from 'antd'
-import { FileMarkdownOutlined, FilePdfOutlined, ApiOutlined, RocketOutlined, HistoryOutlined } from '@ant-design/icons'
+import { FileMarkdownOutlined, FilePdfOutlined, ApiOutlined, RocketOutlined, HistoryOutlined, SettingOutlined } from '@ant-design/icons'
 import {
   startMarkdownReview, startFileReview, startTapdReview,
 } from '../api/client'
-import { useNavigate } from 'react-router-dom'
 
 const { TextArea } = Input
 const { Title, Text } = Typography
@@ -33,12 +32,20 @@ export default function HomePage() {
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <Button
-            icon={<HistoryOutlined />}
-            onClick={() => navigate('/history')}
-          >
-            审查历史
-          </Button>
+          <Space>
+            <Button
+              icon={<HistoryOutlined />}
+              onClick={() => navigate('/history')}
+            >
+              审查历史
+            </Button>
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => navigate('/settings')}
+            >
+              LLM 设置
+            </Button>
+          </Space>
         </div>
         <Title level={2}>
           <RocketOutlined /> RevYou 需求文档审查系统

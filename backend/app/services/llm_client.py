@@ -78,6 +78,14 @@ class LLMClient:
         self._semaphore = asyncio.Semaphore(settings.llm_concurrency)
         self._call_counter = 0
 
+    def reconfigure(self):
+        """Rebuild the underlying client after settings change at runtime."""
+        self.client = AsyncOpenAI(
+            base_url=settings.llm_base_url,
+            api_key=settings.llm_api_key,
+        )
+        self._semaphore = asyncio.Semaphore(settings.llm_concurrency)
+
     async def complete(
         self,
         system_prompt: str,

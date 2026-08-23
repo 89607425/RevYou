@@ -240,3 +240,61 @@ export const STATUS_META: Record<string, { label: string; color: string }> = {
   done: { label: '已完成', color: 'success' },
   failed: { label: '失败', color: 'error' },
 }
+
+// ── LLM Settings API ────────────────────────────────────────────────
+
+export interface LLMSettings {
+  base_url: string
+  model: string
+  temperature: number
+  max_tokens: number
+  concurrency: number
+  api_key_set: boolean
+  api_key_masked: string
+}
+
+export interface LLMSettingsUpdate {
+  base_url?: string
+  model?: string
+  temperature?: number
+  max_tokens?: number
+  /** Only send when the user typed a new key; empty means keep current */
+  api_key?: string
+}
+
+export async function getLLMSettings(): Promise<LLMSettings> {
+  const resp = await fetch(`${API_BASE}/api/settings/llm`)
+  if (!resp.ok) throw new Error(await resp.text())
+  return resp.json()
+}
+
+export async function updateLLMSettings(payload: LLMSettingsUpdate): Promise<LLMSettings> {
+  const resp = await fetch(`${API_BASE}/api/settings/llm`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!resp.ok) throw new Error(await resp.text())
+  return resp.json()
+}
+
+export interface LLMTestResult {
+  ok: boolean
+  model: string
+  latency_ms: number
+  reply: string
+}
+
+export async function testLLMConnection(payload: {
+  base_url?: string
+  model?: string
+  api_key?: string
+}): Promise<LLMTestResult> {
+  const resp = await fetch(`${API_BASE}/api/settings/llm/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!resp.ok) throw new Error(await resp.text())
+  return resp.json()
+}

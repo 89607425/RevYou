@@ -307,6 +307,9 @@ RevYou/
 | `/api/jobs/{job_id}`                  | DELETE | 删除任务（含其全部 thinking steps）   |
 | `/api/tapd/stories/search`            | GET    | 按关键字搜索 TAPD 需求                |
 | `/api/tapd/stories/fetch`             | POST   | 审查前预览 TAPD 需求                  |
+| `/api/settings/llm`                   | GET    | 查看当前 LLM 配置（API Key 脱敏）      |
+| `/api/settings/llm`                   | PUT    | 运行时更新 LLM 服务商/密钥/模型，持久化到 `.env` |
+| `/api/settings/llm/test`              | POST  | 发送测试请求验证 LLM 连通性与凭证      |
 
 后端启动后，完整 API 文档在 `http://127.0.0.1:8000/docs`。
 

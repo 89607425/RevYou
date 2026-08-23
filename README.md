@@ -307,6 +307,9 @@ RevYou/
 | `/api/jobs/{job_id}`                  | DELETE | Delete a job (and all its thinking steps)            |
 | `/api/tapd/stories/search`            | GET    | Search TAPD stories by keyword                       |
 | `/api/tapd/stories/fetch`             | POST   | Preview a TAPD story before review                   |
+| `/api/settings/llm`                   | GET    | Current LLM config (API key masked)                  |
+| `/api/settings/llm`                   | PUT    | Update LLM provider / key / model at runtime, persisted to `.env` |
+| `/api/settings/llm/test`              | POST  | Send a ping to verify LLM connectivity & credentials |
 
 Full interactive docs at `http://127.0.0.1:8000/docs` once the backend is running.
 

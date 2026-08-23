@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import review, tapd
+from .routers import review, tapd, llm_settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,6 +42,7 @@ app.add_middleware(
 
 app.include_router(review.router)
 app.include_router(tapd.router)
+app.include_router(llm_settings.router)
 
 
 @app.get("/")
