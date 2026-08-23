@@ -1,11 +1,11 @@
 """Review router — main API endpoints."""
 import asyncio
 import json
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..storage.session_store import session_store
+from ..storage import session_store
 from ..services.orchestrator import orchestrator
 from ..services.event_bus import event_bus
 
@@ -140,6 +140,29 @@ async def get_trace(job_id: str):
 
 
 @router.get("/jobs")
-async def list_jobs(limit: int = 20):
-    """List recent jobs."""
-    return session_store.list_jobs(limit)
+async def list_jobs(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    status: str | None = Query(None),
+    source_type: str | None = Query(None),
+    keyword: str | None = Query(None),
+):
+    """List recent jobs with optional filtering and pagination."""
+    jobs = session_store.list_jobs(
+        limit=limit, offset=offset,
+        status=status, source_type=source_type, keyword=keyword,
+    )
+    total = session_store.count_jobs(
+        status=status, source_type=source_type, keyword=keyword
+    )
+    return {"items": jobs, "total": total, "limit": limit, "offset": offset}
+
+
+@router.delete("/jobs/{job_id}")
+async def delete_job(job_id: str):
+    """Delete a job and all its thinking steps."""
+    job = session_store.get_job(job_id)
+    if not job:
+        raise HTTPException(404, f"Job {job_id} not found")
+    session_store.delete_job(job_id)
+    return {"deleted": job_id}

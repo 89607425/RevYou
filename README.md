@@ -59,7 +59,8 @@
 - 🧩 **Three perspectives in parallel.** PM, Dev, and Test review independently first; a cross-perspective pass then asks each agent to chase the blind spots of the other two.
 - 🧰 **Three input channels.** Paste Markdown, upload a `.md` / `.pdf` file, or pull a story straight from TAPD via OpenAPI.
 - 📜 **Structured reports.** Issues are scored on a four-level severity scale, with cross-agent agreements/disagreements surfaced, and a final readiness verdict.
-- 📡 **Full thinking trace, live.** Every intermediate artifact (plan, execute, reflect, consolidate) is persisted in SQLite and pushed to the browser via Server-Sent Events.
+- 💾 **MySQL-backed persistence.** Every review — final report, full thinking trace, intermediate artifacts — is persisted to MySQL by default (SQLite available as fallback), and the **History** page lets you revisit, re-open, or delete any past review.
+- 📡 **Full thinking trace, live.** Every intermediate artifact (plan, execute, reflect, consolidate) is persisted in the database and pushed to the browser via Server-Sent Events.
 - 🛡️ **Hard cost & safety rails.** Agents are pure reasoning — they cannot call tools, browse, or hit the network. All I/O is funnelled through the Orchestrator.
 
 ---
@@ -80,6 +81,24 @@
                                                                           │ + thinking trace │
                                                                           └──────────────────┘
 ```
+
+### Phase 1 — three agents in parallel
+
+<img src="docs/images/screenshot-phase1-progress.png" alt="RevYou Phase 1: three agents in parallel" width="860"/>
+
+Each agent independently runs its own five-step loop. Different requirements produce different `ReviewPlan`s — the agents decide for themselves which focus areas to dig into.
+
+### Phase 2 — cross-perspective review
+
+<img src="docs/images/screenshot-phase2-cross-review.png" alt="RevYou Phase 2: cross-perspective review" width="860"/>
+
+After Phase 1, every agent receives the blind spots surfaced by the other two and runs a focused re-review on them. The labels you see here flip from `独立审查` to `交叉审查`.
+
+### Final aggregated report
+
+<img src="docs/images/screenshot-final-report.png" alt="RevYou final aggregated report" width="860"/>
+
+The Orchestrator dedupes issues across agents, scores overall quality, counts severities, lists the top risks, and renders a ready-to-export final report (Markdown or JSON).
 
 ---
 
@@ -135,6 +154,40 @@ Cross-agent agreement is a strong signal: if PM and Test both flag the same gap,
 
 ---
 
+## 💾 Persistent storage
+
+Every review — final report, full thinking trace, and all intermediate artifacts — is persisted to the configured storage backend. The default is **MySQL** (recommended for shared / long-running deployments), with **SQLite** available as a single-machine fallback.
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│  MySQL (default)            SQLite (fallback)                      │
+│  ──────────────────         ─────────────────                      │
+│  • PyMySQL + DBUtils pool   • Zero-config, file-based              │
+│  • InnoDB / utf8mb4         • Single-process safety                │
+│  • ON DELETE CASCADE        • Foreign keys enforced                 │
+│  • Backs concurrent users   • Ideal for local-only or solo dev      │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Both backends implement the same `SessionStoreBase` interface, so swapping is a one-line config change (`STORAGE_BACKEND=sqlite`) with no code edits.
+
+| Environment variable   | Default            | Description                                |
+|------------------------|--------------------|--------------------------------------------|
+| `STORAGE_BACKEND`      | `mysql`            | `mysql` (default) or `sqlite` (fallback)   |
+| `MYSQL_HOST`           | `127.0.0.1`        | MySQL host                                 |
+| `MYSQL_PORT`           | `3306`             | MySQL port                                 |
+| `MYSQL_USER`           | `root`             | MySQL user                                 |
+| `MYSQL_PASSWORD`       | *(empty)*          | MySQL password                             |
+| `MYSQL_DATABASE`       | `revyou_reviews`   | MySQL database (auto-created)              |
+| `MYSQL_POOL_SIZE`      | `5`                | DBUtils connection pool size               |
+| `DB_PATH`              | `data/review.db`   | SQLite file path (only when fallback)      |
+
+Schema is auto-created on first start. Foreign keys with `ON DELETE CASCADE` mean deleting a job cleans up all its thinking steps in one call.
+
+> 💡 The frontend **History** page (`/history`) is the easiest way to look at what was saved — it supports keyword search, source-type and status filters, and inline delete.
+
+---
+
 ## 🚀 Quick start
 
 ### Prerequisites
@@ -155,6 +208,7 @@ cd backend
 cp .env.example .env
 # Edit .env and fill in:
 #   LLM_API_KEY=sk-...
+#   MYSQL_PASSWORD=...        (or set STORAGE_BACKEND=sqlite to skip MySQL)
 #   TAPD_TOKEN=...            (only if you need TAPD)
 #   TAPD_WORKSPACE_IDS=...    (comma-separated)
 ```
@@ -210,7 +264,10 @@ RevYou/
 │   │   │   ├── report_aggregator.py   # Cross-agent deduplication & scoring
 │   │   │   ├── tapd_adapter.py        # TAPD OpenAPI client
 │   │   │   └── event_bus.py           # In-process SSE event bus
-│   │   └── storage/                   # SQLite job/report persistence
+│   │   └── storage/                   # Pluggable persistence (MySQL | SQLite)
+│   │       ├── base.py                # Abstract storage interface
+│   │       ├── mysql_store.py         # MySQL backend (default, recommended)
+│   │       └── sqlite_store.py        # SQLite fallback (single-machine)
 │   ├── prompts/
 │   │   ├── phase1/                    # plan / execute / reflect / consolidate
 │   │   ├── phase2/                    # cross-perspective pass
@@ -218,7 +275,7 @@ RevYou/
 │   └── tests/                         # Pytest suite
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/                     # Upload page, Report page
+│   │   ├── pages/                     # Home, Report, History pages
 │   │   ├── components/                # Trace viewer, issue cards
 │   │   ├── api/                       # Fetch + SSE client
 │   │   ├── App.tsx
@@ -243,9 +300,11 @@ RevYou/
 | `/api/review/markdown`                | POST   | Submit raw Markdown for review                       |
 | `/api/review/file`                    | POST   | Upload a `.md` or `.pdf` file                        |
 | `/api/review/tapd`                    | POST   | Pull a story from TAPD and review it                 |
+| `/api/jobs`                           | GET    | List past reviews (filters: `status`, `source_type`, `keyword`, paginated) |
 | `/api/jobs/{job_id}`                  | GET    | Fetch job status + final report                      |
 | `/api/jobs/{job_id}/events`           | GET    | Subscribe to live SSE trace                          |
 | `/api/jobs/{job_id}/trace`            | GET    | Replay the full thinking trace                       |
+| `/api/jobs/{job_id}`                  | DELETE | Delete a job (and all its thinking steps)            |
 | `/api/tapd/stories/search`            | GET    | Search TAPD stories by keyword                       |
 | `/api/tapd/stories/fetch`             | POST   | Preview a TAPD story before review                   |
 
@@ -260,7 +319,7 @@ Full interactive docs at `http://127.0.0.1:8000/docs` once the backend is runnin
 - 🐍 Python 3.10+ with Pydantic v2
 - ⚡ FastAPI + Uvicorn
 - 🤖 DeepSeek (OpenAI-compatible chat completion, JSON mode, `max_tokens=8192`)
-- 🗄️ SQLite (no external DB to spin up)
+- 🗄️ MySQL 8.0+ via `PyMySQL` + `DBUtils` connection pool (SQLite available as a single-machine fallback)
 - 📄 `python-markdown` for MD parsing, `PyMuPDF` for PDF
 - 🌐 `httpx` for TAPD OpenAPI
 - 🧪 `pytest` for the test suite
@@ -284,7 +343,7 @@ Full interactive docs at `http://127.0.0.1:8000/docs` once the backend is runnin
 3. **Small core, big leverage.** The Orchestrator stays under ~1000 lines, the agent loop under ~400. The hard problems are in the prompts, not the code.
 4. **Local-first, single-user.** No auth, no multi-tenant, no cloud lock-in. Bring your own API key.
 5. **Token-aware.** `max_tokens=8192`, `top_p` temperature 0.2, JSON mode, plus a JSON-recovery pass that salvages truncated outputs instead of throwing them away.
-6. **Boring infrastructure on purpose.** SQLite, FastAPI, Vite. The interesting work is the agent loop, not the plumbing.
+6. **Boring infrastructure on purpose.** MySQL + DBUtils for storage, FastAPI, Vite. The interesting work is the agent loop, not the plumbing.
 
 ---
 
@@ -296,6 +355,7 @@ Full interactive docs at `http://127.0.0.1:8000/docs` once the backend is runnin
 - [x] Live SSE trace streaming
 - [x] Structured aggregated report
 - [x] Bilingual README (EN / 简体中文)
+- [x] MySQL-backed persistence with History page
 - [ ] Diff review — review a *diff* of two requirement versions, not just the latest one
 - [ ] Historical quality score — track how review quality evolves over time
 - [ ] Pluggable LLM providers (OpenAI / Anthropic / local Ollama) with per-provider prompt tuning

@@ -134,3 +134,8 @@ continue.config.json
 *.zip
 .cache/
 coverage/
+
+# Project-specific
+# Original Chinese-named source screenshots (use docs/images/screenshot-*.png instead)
+docs/assists/
+docs/assets/

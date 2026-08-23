@@ -12,7 +12,7 @@ from ..models.review import (
     JobStatus, AgentPhase1Report, AgentPhase2Report,
     ThinkingStep, AgentPhase1Report as P1R,
 )
-from ..storage.session_store import session_store
+from ..storage import session_store
 from .agent_runner import AgentRunner
 from .context_builder import ContextBuilder
 from .doc_parser import DocParser

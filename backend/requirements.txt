@@ -8,3 +8,6 @@ PyMuPDF>=1.23
 aiosqlite>=0.20
 sse-starlette>=2.0
 python-multipart>=0.0.9
+# MySQL persistent storage
+PyMySQL>=1.1
+DBUtils>=3.1

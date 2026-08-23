@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import {
   Card, Tabs, Input, Button, Upload, Form, message, Typography, Space, Alert,
 } from 'antd'
-import { FileMarkdownOutlined, FilePdfOutlined, ApiOutlined, RocketOutlined } from '@ant-design/icons'
+import { FileMarkdownOutlined, FilePdfOutlined, ApiOutlined, RocketOutlined, HistoryOutlined } from '@ant-design/icons'
 import {
   startMarkdownReview, startFileReview, startTapdReview,
 } from '../api/client'
+import { useNavigate } from 'react-router-dom'
 
 const { TextArea } = Input
 const { Title, Text } = Typography
@@ -15,7 +16,6 @@ export default function HomePage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [mdContent, setMdContent] = useState('')
-
   const handleSubmit = async (fn: () => Promise<string>) => {
     setLoading(true)
     try {
@@ -32,8 +32,16 @@ export default function HomePage() {
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <Button
+            icon={<HistoryOutlined />}
+            onClick={() => navigate('/history')}
+          >
+            审查历史
+          </Button>
+        </div>
         <Title level={2}>
-          <RocketOutlined /> 需求文档审查 Multi-Agent 系统
+          <RocketOutlined /> RevYou 需求文档审查系统
         </Title>
         <Text type="secondary">
           产品 / 开发 / 测试三个自主 Agent 并行交叉审查 · Plan → Execute → Reflect → Consolidate

@@ -59,7 +59,8 @@
 - 🧩 **三视角并行 + 交叉。** PM / Dev / Test 先独立审查；再让每个 Agent 盯一遍"另外两个 Agent 漏掉了什么"做定向重审。
 - 🧰 **三种输入通道。** 粘贴 Markdown、上传 `.md` / `.pdf` 文件、通过 OpenAPI 直连 TAPD 拉需求。
 - 📜 **结构化报告。** 问题按四级严重度分类、统计跨 Agent 认同/异议、给出最终就绪结论，支持导出 MD / JSON。
-- 📡 **思考轨迹全量可见。** 每一步中间产物（plan / execute / reflect / consolidate）全部落 SQLite，并通过 SSE 实时推到浏览器。
+- 💾 **MySQL 持久化存储。** 每次审查的最终报告、完整思考轨迹和所有中间产物默认全部入库 MySQL（SQLite 可作单机回退），专门的**审查历史**页支持随时回看、重开或删除。
+- 📡 **思考轨迹全量可见。** 每一步中间产物（plan / execute / reflect / consolidate）全部落库，并通过 SSE 实时推到浏览器。
 - 🛡️ **硬性成本与安全护栏。** Agent 是纯推理单元——不能调工具、不能上网、不能读写文件。所有 I/O 全部由 Orchestrator 兜住。
 
 ---
@@ -80,6 +81,24 @@
                                                                        │ + 思考轨迹       │
                                                                        └──────────────────┘
 ```
+
+### Phase 1 — 三视角并行独立审查
+
+<img src="docs/images/screenshot-phase1-progress.png" alt="RevYou Phase 1：三 Agent 并行" width="860"/>
+
+每个 Agent 独立运行自己的五步循环。不同的需求会自然走出不同的 `ReviewPlan`——审哪里、按什么顺序，全是 Agent 自己拍板。
+
+### Phase 2 — 跨视角交叉审查
+
+<img src="docs/images/screenshot-phase2-cross-review.png" alt="RevYou Phase 2：交叉审查" width="860"/>
+
+Phase 1 结束后，每个 Agent 拿到另外两个 Agent 暴露的盲区，再做一轮定向重审。图中标签从「独立审查」翻成「交叉审查」即代表进入本阶段。
+
+### 最终聚合报告
+
+<img src="docs/images/screenshot-final-report.png" alt="RevYou 最终聚合报告" width="860"/>
+
+Orchestrator 把所有 Agent 的问题去重打分、汇总严重度、列出 Top 风险，并渲染出可一键导出（Markdown / JSON）的最终报告。
 
 ---
 
@@ -102,7 +121,7 @@
 <img src="docs/images/architecture.svg" alt="RevYou 三层架构" width="920"/>
 
 - **前端**（React 18 + Vite + Ant Design 5）是薄薄的客户端，只通过 HTTP / SSE 跟 Orchestrator 对话。
-- **Orchestrator** 是 FastAPI 进程，**独占**所有外部交互：文档解析、TAPD OpenAPI、LLM 调用、SQLite 持久化、SSE 事件分发、最终报告聚合。
+- **Orchestrator** 是 FastAPI 进程，**独占**所有外部交互：文档解析、TAPD OpenAPI、LLM 调用、MySQL 持久化、SSE 事件分发、最终报告聚合。
 - **Agent** 是三个一模一样的五步循环，每个对应一种角色（PM / Dev / Test）。它们不共享状态、并发执行，只在最后通过报告交换信息。
 
 ---
@@ -135,6 +154,40 @@
 
 ---
 
+## 💾 持久化存储
+
+每一次审查——最终报告、完整思考轨迹、所有中间产物——都会写入配置好的存储后端。默认是 **MySQL**（适合多人协作 / 长时间部署），**SQLite** 作为单机回退方案。
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│  MySQL（默认）            SQLite（回退）                           │
+│  ──────────────────         ─────────────────                      │
+│  • PyMySQL + DBUtils 连接池   • 零配置，文件式                      │
+│  • InnoDB / utf8mb4           • 单进程安全                          │
+│  • ON DELETE CASCADE          • 强制外键                            │
+│  • 支撑并发用户               • 适合本机或单人开发                   │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+两个后端实现同一个 `SessionStoreBase` 接口，切换只改一行配置（`STORAGE_BACKEND=sqlite`），业务代码完全不用动。
+
+| 环境变量             | 默认值            | 说明                                       |
+|----------------------|-------------------|--------------------------------------------|
+| `STORAGE_BACKEND`    | `mysql`           | `mysql`（默认）或 `sqlite`（回退）         |
+| `MYSQL_HOST`         | `127.0.0.1`       | MySQL 主机                                 |
+| `MYSQL_PORT`         | `3306`            | MySQL 端口                                 |
+| `MYSQL_USER`         | `root`            | MySQL 用户                                 |
+| `MYSQL_PASSWORD`     | *(空)*            | MySQL 密码                                 |
+| `MYSQL_DATABASE`     | `revyou_reviews`  | MySQL 数据库名（首次启动自动建）           |
+| `MYSQL_POOL_SIZE`    | `5`               | DBUtils 连接池大小                         |
+| `DB_PATH`            | `data/review.db`  | SQLite 文件路径（仅在回退模式下生效）      |
+
+表结构首次启动时自动创建。`ON DELETE CASCADE` 外键约束保证删除一个 job 时所有 thinking_steps 一并清理。
+
+> 💡 前端**审查历史**页（`/history`）是查看持久化结果最直观的方式，支持关键词搜索、来源/状态筛选和就地删除。
+
+---
+
 ## 🚀 快速开始
 
 ### 准备环境
@@ -155,6 +208,7 @@ cd backend
 cp .env.example .env
 # 编辑 .env，填入：
 #   LLM_API_KEY=sk-...
+#   MYSQL_PASSWORD=...   （或设 STORAGE_BACKEND=sqlite 走 SQLite 回退）
 #   TAPD_TOKEN=...            （仅 TAPD 集成需要）
 #   TAPD_WORKSPACE_IDS=...    （逗号分隔）
 ```
@@ -210,7 +264,10 @@ RevYou/
 │   │   │   ├── report_aggregator.py   # 跨 Agent 去重 + 评分
 │   │   │   ├── tapd_adapter.py        # TAPD OpenAPI 客户端
 │   │   │   └── event_bus.py           # 进程内 SSE 事件总线
-│   │   └── storage/                   # SQLite 任务 / 报告持久化
+│   │   └── storage/                   # 可插拔持久化（MySQL | SQLite）
+│   │       ├── base.py                # 存储抽象接口
+│   │       ├── mysql_store.py         # MySQL 后端（默认推荐）
+│   │       └── sqlite_store.py        # SQLite 回退（单机）
 │   ├── prompts/
 │   │   ├── phase1/                    # plan / execute / reflect / consolidate
 │   │   ├── phase2/                    # 交叉审查 prompt
@@ -218,7 +275,7 @@ RevYou/
 │   └── tests/                         # Pytest 测试集
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/                     # 上传页、报告页
+│   │   ├── pages/                     # 主页、报告页、历史记录页
 │   │   ├── components/                # 轨迹查看器、问题卡片
 │   │   ├── api/                       # Fetch + SSE 客户端
 │   │   ├── App.tsx
@@ -243,9 +300,11 @@ RevYou/
 | `/api/review/markdown`                | POST   | 提交 Markdown 文本进行审查            |
 | `/api/review/file`                    | POST   | 上传 `.md` / `.pdf` 文件审查          |
 | `/api/review/tapd`                    | POST   | 从 TAPD 拉取需求并审查                |
+| `/api/jobs`                           | GET    | 列出历史审查（支持 `status` / `source_type` / `keyword` 筛选，分页） |
 | `/api/jobs/{job_id}`                  | GET    | 查询任务状态 + 最终报告               |
 | `/api/jobs/{job_id}/events`           | GET    | 订阅实时 SSE 轨迹                     |
 | `/api/jobs/{job_id}/trace`            | GET    | 回放完整思考轨迹                      |
+| `/api/jobs/{job_id}`                  | DELETE | 删除任务（含其全部 thinking steps）   |
 | `/api/tapd/stories/search`            | GET    | 按关键字搜索 TAPD 需求                |
 | `/api/tapd/stories/fetch`             | POST   | 审查前预览 TAPD 需求                  |
 
@@ -260,7 +319,7 @@ RevYou/
 - 🐍 Python 3.10+ · Pydantic v2
 - ⚡ FastAPI + Uvicorn
 - 🤖 DeepSeek（OpenAI 兼容 chat completion、JSON 模式、`max_tokens=8192`）
-- 🗄️ SQLite（无需额外数据库）
+- 🗄️ MySQL 8.0+，通过 `PyMySQL` + `DBUtils` 连接池（SQLite 仍可作为单机回退）
 - 📄 `python-markdown` 解析 MD · `PyMuPDF` 解析 PDF
 - 🌐 `httpx` 调 TAPD OpenAPI
 - 🧪 `pytest` 单元测试
@@ -284,7 +343,7 @@ RevYou/
 3. **核心小、外延大。** Orchestrator 控制在 ~1000 行内，Agent 循环控制在 ~400 行内。真正难的东西写在 prompt 里，不写在代码里。
 4. **本地优先、单用户。** 无认证、无多租户、无云锁定。带上你自己的 API key 就能跑。
 5. **Token 友好。** `max_tokens=8192`、温度 0.2、JSON 模式，再加一道 JSON 抢救把截断的输出救回来，而不是直接扔掉。
-6. **基础设施故意选"无聊"的。** SQLite、FastAPI、Vite。真正有意思的是 Agent 循环，不是这些脚手架。
+6. **基础设施故意选"无聊"的。** MySQL + DBUtils 做存储、FastAPI、Vite。真正有意思的是 Agent 循环，不是这些脚手架。
 
 ---
 
@@ -296,6 +355,7 @@ RevYou/
 - [x] SSE 实时轨迹推送
 - [x] 聚合后的结构化报告
 - [x] 双语 README（EN / 简体中文）
+- [x] MySQL 持久化存储 + 审查历史页
 - [ ] **Diff 审查**——审两个版本之间的差异，不只审最新版本
 - [ ] **历史质量分**——追踪审查质量随时间的演化
 - [ ] **可插拔 LLM 提供商**（OpenAI / Anthropic / 本地 Ollama），每个 provider 单独调优 prompt

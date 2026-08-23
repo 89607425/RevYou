@@ -1,5 +1,6 @@
 """FastAPI entry point."""
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,10 +12,24 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize storage backend on startup
+    from .storage import session_store
+    logging.getLogger(__name__).info(
+        "Storage backend ready: %s", type(session_store).__name__
+    )
+    yield
+    # Close pool on shutdown
+    session_store.close()
+
+
 app = FastAPI(
-    title="需求文档审查 Multi-Agent 系统",
-    version="0.1.0",
-    description="三视角（产品/开发/测试）自主 Agent 需求文档审查",
+    title="RevYou",
+    version="1.0.0",
+    description="Autonomous three-agent requirement document review system",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -32,8 +47,8 @@ app.include_router(tapd.router)
 @app.get("/")
 async def root():
     return {
-        "name": "需求文档审查 Multi-Agent 系统",
-        "version": "0.1.0",
+        "name": "RevYou",
+        "version": "1.0.0",
         "docs": "/docs",
     }
 

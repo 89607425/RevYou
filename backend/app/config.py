@@ -28,10 +28,24 @@ class Settings(BaseSettings):
     # App
     app_host: str = "127.0.0.1"
     app_port: int = 8000
-    db_path: str = str(Path(__file__).resolve().parent.parent.parent / "data" / "review.db")
 
     # Concurrency limit for LLM calls
     llm_concurrency: int = 6
+
+    # Persistent storage
+    # backend: 'mysql' (default, recommended) | 'sqlite' (single-machine fallback)
+    storage_backend: str = "mysql"
+    # SQLite (used only when storage_backend='sqlite')
+    db_path: str = str(
+        Path(__file__).resolve().parent.parent.parent / "data" / "review.db"
+    )
+    # MySQL (used when storage_backend='mysql')
+    mysql_host: str = "127.0.0.1"
+    mysql_port: int = 3306
+    mysql_user: str = "root"
+    mysql_password: str = ""
+    mysql_database: str = "revyou_reviews"
+    mysql_pool_size: int = 5
 
 
 settings = Settings()

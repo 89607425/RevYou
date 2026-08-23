@@ -181,3 +181,62 @@ export const SEVERITY_META: Record<string, { label: string; color: string }> = {
   minor: { label: '中', color: 'gold' },
   suggestion: { label: '建议', color: 'blue' },
 }
+
+// ── History API ──────────────────────────────────────────────────────
+
+export interface JobListItem {
+  id: string
+  status: string
+  source_type: string
+  document_title: string | null
+  source_ref: string | null
+  created_at: string
+  updated_at: string
+  has_report: number
+}
+
+export interface JobListResponse {
+  items: JobListItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export async function listJobs(params?: {
+  limit?: number
+  offset?: number
+  status?: string
+  source_type?: string
+  keyword?: string
+}): Promise<JobListResponse> {
+  const sp = new URLSearchParams()
+  if (params?.limit) sp.set('limit', String(params.limit))
+  if (params?.offset) sp.set('offset', String(params.offset))
+  if (params?.status) sp.set('status', params.status)
+  if (params?.source_type) sp.set('source_type', params.source_type)
+  if (params?.keyword) sp.set('keyword', params.keyword)
+  const resp = await fetch(`${API_BASE}/api/jobs?${sp.toString()}`)
+  if (!resp.ok) throw new Error(await resp.text())
+  return resp.json()
+}
+
+export async function deleteJob(jobId: string): Promise<void> {
+  const resp = await fetch(`${API_BASE}/api/jobs/${jobId}`, { method: 'DELETE' })
+  if (!resp.ok) throw new Error(await resp.text())
+}
+
+export const SOURCE_TYPE_LABELS: Record<string, string> = {
+  markdown: 'Markdown',
+  pdf: 'PDF',
+  tapd: 'TAPD',
+}
+
+export const STATUS_META: Record<string, { label: string; color: string }> = {
+  queued: { label: '排队中', color: 'default' },
+  parsing: { label: '解析中', color: 'processing' },
+  phase1: { label: '独立审查', color: 'processing' },
+  phase2: { label: '交叉审查', color: 'processing' },
+  aggregating: { label: '聚合中', color: 'processing' },
+  done: { label: '已完成', color: 'success' },
+  failed: { label: '失败', color: 'error' },
+}
