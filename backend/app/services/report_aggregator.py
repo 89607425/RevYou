@@ -113,7 +113,7 @@ class ReportAggregator:
             cross_summary.agreements = total_agreements
             cross_summary.disagreements = total_disagreements
             cross_summary.typical_disagreements = [
-                f"[{d.peer_issue_id}] {d.reason}"
+                f"[{d.peer_issue_id}] {d.comment}"
                 for p2 in phase2_reports.values()
                 for d in p2.peer_disagreements
             ][:5]
