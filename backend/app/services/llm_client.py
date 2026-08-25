@@ -74,6 +74,7 @@ class LLMClient:
         self.client = AsyncOpenAI(
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key,
+            timeout=120.0,
         )
         self._semaphore = asyncio.Semaphore(settings.llm_concurrency)
         self._call_counter = 0
@@ -83,6 +84,7 @@ class LLMClient:
         self.client = AsyncOpenAI(
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key,
+            timeout=120.0,
         )
         self._semaphore = asyncio.Semaphore(settings.llm_concurrency)
 

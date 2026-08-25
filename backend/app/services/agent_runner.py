@@ -307,9 +307,32 @@ class AgentRunner:
             cross_plan = CrossReviewPlan(**plan_data)
             await self._emit("plan", json.dumps(plan_data, ensure_ascii=False), "", "phase2")
 
-            logger.info(
-                f"[{self.role}] Cross plan: {len(cross_plan.re_review_targets)} targets"
-            )
+            # Fallback: if LLM produced no re_review_targets, auto-populate
+            # from peer findings so the cross-review chain doesn't run empty
+            if not cross_plan.re_review_targets:
+                my_locations = {
+                    iss.location for iss in my_phase1.issues if iss.location
+                }
+                peer_locations: list[str] = []
+                seen: set[str] = set()
+                for peer in peer_reports:
+                    for iss in peer.issues:
+                        loc = iss.location or ""
+                        if loc and loc not in my_locations and loc not in seen:
+                            seen.add(loc)
+                            peer_locations.append(loc)
+                if peer_locations:
+                    cross_plan.re_review_targets = peer_locations[:5]
+                else:
+                    cross_plan.re_review_targets = ["评估所有同行发现：给出认同或异议"]
+                logger.info(
+                    f"[{self.role}] Cross plan: LLM produced 0 targets, "
+                    f"auto-populated {len(cross_plan.re_review_targets)} from peer findings"
+                )
+            else:
+                logger.info(
+                    f"[{self.role}] Cross plan: {len(cross_plan.re_review_targets)} targets"
+                )
 
             # ─── Step 2: Execute cross-review (parallel) ──────────────────
             cross_findings = []
@@ -385,6 +408,33 @@ class AgentRunner:
 
     async def _cross_consolidate(self, cross_findings: list[dict],
                                   reflect_result: ReflectResult) -> AgentPhase2Report:
+        # Pre-extract peer opinions from execute results so they survive
+        # even if the consolidate LLM drops them
+        pre_agreements: dict[str, PeerOpinion] = {}
+        pre_disagreements: dict[str, PeerOpinion] = {}
+        pre_new_issues_raw: list[dict] = []
+        pre_adjustments: dict[str, dict] = {}
+
+        for f in cross_findings:
+            for op in f.get("peer_opinions", []):
+                pid = op.get("peer_issue_id", "")
+                if not pid:
+                    continue
+                if op.get("type") == "agreement" and pid not in pre_agreements:
+                    pre_agreements[pid] = PeerOpinion(
+                        peer_issue_id=pid, comment=op.get("comment", "")
+                    )
+                elif op.get("type") == "disagreement" and pid not in pre_disagreements:
+                    pre_disagreements[pid] = PeerOpinion(
+                        peer_issue_id=pid, comment=op.get("comment", "")
+                    )
+            for adj in f.get("severity_adjustments", []):
+                iid = adj.get("issue_id", "")
+                if iid and iid not in pre_adjustments:
+                    pre_adjustments[iid] = adj
+            for iss in f.get("new_issues", []):
+                pre_new_issues_raw.append(iss)
+
         findings_str = json.dumps(cross_findings, ensure_ascii=False)
         reflect_str = json.dumps(reflect_result.model_dump(), ensure_ascii=False)
         sys_prompt, user_prompt = prompt_manager.get_phase2_consolidate(
@@ -394,19 +444,42 @@ class AgentRunner:
         await self._emit("consolidate", json.dumps(data, ensure_ascii=False), "", "phase2")
 
         fp_ids = set(reflect_result.false_positives)
-        new_issues = [Issue(**i) for i in data.get("new_issues", [])
-                      if i.get("id", "") not in fp_ids]
+
+        # New issues: prefer LLM output (it deduplicates), fallback to pre-extracted
+        llm_new_issues = [Issue(**i) for i in data.get("new_issues", [])
+                          if i.get("id", "") not in fp_ids]
+        if llm_new_issues:
+            new_issues = llm_new_issues
+        else:
+            new_issues = [Issue(**i) for i in pre_new_issues_raw
+                          if i.get("id", "") not in fp_ids]
+
+        # Agreements: use LLM output if non-empty, else pre-extracted
+        llm_agreements = [PeerOpinion(**p) for p in data.get("peer_agreements", [])]
+        agreements = llm_agreements if llm_agreements else list(pre_agreements.values())
+
+        # Disagreements: same fallback
+        llm_disagreements = [PeerOpinion(**p) for p in data.get("peer_disagreements", [])]
+        disagreements = llm_disagreements if llm_disagreements else list(pre_disagreements.values())
+
+        # Adjustments: same fallback (remap from/to → from_severity/to_severity)
+        def _parse_adj(adj: dict) -> SeverityAdjust:
+            return SeverityAdjust(
+                issue_id=adj.get("issue_id", ""),
+                from_severity=adj.get("from", adj.get("from_severity", "major")),
+                to_severity=adj.get("to", adj.get("to_severity", "major")),
+                reason=adj.get("reason", ""),
+            )
+        llm_adjustments = [_parse_adj(s) for s in data.get("severity_adjustments", [])]
+        if llm_adjustments:
+            severity_adjustments = llm_adjustments
+        else:
+            severity_adjustments = [_parse_adj(a) for a in pre_adjustments.values()]
 
         return AgentPhase2Report(
             role=self.role,
-            peer_agreements=[
-                PeerOpinion(**p) for p in data.get("peer_agreements", [])
-            ],
-            peer_disagreements=[
-                PeerOpinion(**p) for p in data.get("peer_disagreements", [])
-            ],
+            peer_agreements=agreements,
+            peer_disagreements=disagreements,
             new_issues=new_issues,
-            severity_adjustments=[
-                SeverityAdjust(**s) for s in data.get("severity_adjustments", [])
-            ],
+            severity_adjustments=severity_adjustments,
         )
